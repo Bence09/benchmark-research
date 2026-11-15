@@ -1,0 +1,30 @@
+# Tool-policy conditions for the first demo (E1 fixture).
+# One file, many named conditions; a run selects one (D1). baseline_plus_index
+# extends baseline and states only the delta (D2), so the two differ *only* in
+# the declared addition (R2).
+version: 1
+
+conditions:
+  baseline:
+    description: "Task-scoped search: grep + read + submit. Network off."
+    tools:
+      grep:    { directive: allow }
+      read:    { directive: allow }
+      submit:  { directive: allow }
+      network: { directive: deny }           # enforced via container netns=none (D5)
+
+  baseline_plus_index:
+    extends: baseline
+    description: "Baseline plus an index_query retrieval tool (payload opaque to policy)."
+    tools:
+      index_query:
+        directive: add
+        payload:
+          kind: bm25                          # D4: opaque; BM25 now, swappable later
+          index_ref: null                     # resolved + hashed at prepare time (E2)
+          stale: false
+        limits:
+          top_k: 10
+          max_snippet_bytes: 2048
+          timeout_seconds: 30
+        result_shape: pointers_plus_snippet   # E0-S5
