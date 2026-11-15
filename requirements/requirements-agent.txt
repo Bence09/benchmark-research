@@ -1,2 +1,5 @@
 # Pinned upstream source inspected when preparing this starter (reports 2.4.6).
 mini-swe-agent @ git+https://github.com/SWE-agent/mini-swe-agent.git@04d809ceab9df28f9adaed044884180159172930
+# Runtime dependency of the agent (used by mini's tool interface; see docs/SWE_EXPLORE.md).
+# Normally pulled in transitively; pinned explicitly here for reproducibility.
+mcp==2.3.0
