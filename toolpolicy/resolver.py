@@ -134,6 +134,9 @@ def _effective_tool(name: str, spec: dict) -> dict:
         entry["limits"] = spec["limits"]
     if "result_shape" in spec:
         entry["result_shape"] = spec["result_shape"]
+    if "description_style" in spec:
+        # Prompt nudge strength is part of the recorded intervention (no hidden drift).
+        entry["description_style"] = spec["description_style"]
     return entry
 
 

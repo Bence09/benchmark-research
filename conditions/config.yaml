@@ -28,3 +28,21 @@ conditions:
           max_snippet_bytes: 2048
           timeout_seconds: 30
         result_shape: pointers_plus_snippet   # E0-S5
+        description_style: neutral             # tool offered, no preference expressed
+
+  baseline_plus_index_encouraged:
+    extends: baseline_plus_index
+    description: "Same index tool, but the prompt encourages trying it first (recorded nudge)."
+    tools:
+      index_query:
+        directive: add
+        payload:
+          kind: bm25
+          index_ref: null
+          stale: false
+        limits:
+          top_k: 10
+          max_snippet_bytes: 2048
+          timeout_seconds: 30
+        result_shape: pointers_plus_snippet
+        description_style: encouraged          # the only delta from baseline_plus_index

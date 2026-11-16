@@ -78,10 +78,27 @@ class SweExploreAdapter:
 
 
 def _tool_descriptions(policy: dict) -> str:
-    """Describe only tools the resolved policy added (part of the intervention)."""
+    """Describe only tools the resolved policy added (part of the intervention).
+
+    The index tool's wording varies by its recorded `description_style`:
+      - neutral    : offered as one option among grep/read (no preference expressed)
+      - encouraged : the agent is asked to try the index first (a recorded nudge)
+    Both are captured in the effective policy / manifest, so prompt strength is never
+    silent drift. This encourages use; it does not force it (the task still needs
+    normal reads — the index is a shortcut, not a replacement).
+    """
     added = [t for t in policy.get("tools", []) if t.get("status") == "added"]
-    if not any(t["name"] == "index_query" for t in added):
+    idx = next((t for t in added if t["name"] == "index_query"), None)
+    if idx is None:
         return ""
+    style = idx.get("description_style", "neutral")
+    if style == "encouraged":
+        return (
+            "You have an `index_query` tool: run `index_query \"<query>\" --top-k N`\n"
+            "to retrieve ranked candidate regions with snippets across the whole repo.\n"
+            "Use at least once a command starting with `index_query` to locate relevant code quickly, then\n"
+            "confirm with grep/sed as needed. It is a fast way to find where to look.\n"
+        )
     return (
         "You also have an `index_query` tool: run `index_query \"<query>\" --top-k N`\n"
         "to retrieve ranked candidate regions with snippets. It is optional; you may\n"

@@ -183,5 +183,47 @@ class TestOptionBRoundTrip(unittest.TestCase):
             self.assertIn("xarray/core/combine.py", out)
 
 
+class TestNudgeStyle(unittest.TestCase):
+    def setUp(self):
+        from toolpolicy import load_policy
+        self.policy = load_policy(FIXTURE_POLICY)
+        self.adapter = SweExploreAdapter()
+
+    def _prompt(self, condition):
+        from toolpolicy import resolve
+        eff = resolve(self.policy, condition,
+                      required_capabilities=self.adapter.required_capabilities())
+        return eff, self.adapter.agent_prompt({"instance_id": "x", "problem_statement": "y"}, eff)
+
+    def test_neutral_does_not_encourage(self):
+        eff, prompt = self._prompt("baseline_plus_index")
+        idx = next(t for t in eff["tools"] if t["name"] == "index_query")
+        self.assertEqual(idx["description_style"], "neutral")
+        self.assertNotIn("Prefer starting with", prompt.system_template)
+        self.assertIn("index_query", prompt.system_template)
+
+    def test_encouraged_adds_nudge_text(self):
+        eff, prompt = self._prompt("baseline_plus_index_encouraged")
+        idx = next(t for t in eff["tools"] if t["name"] == "index_query")
+        self.assertEqual(idx["description_style"], "encouraged")
+        self.assertIn("Prefer starting with", prompt.system_template)
+
+    def test_nudge_is_only_difference(self):
+        from toolpolicy import resolve
+        n = {t["name"]: t for t in resolve(self.policy, "baseline_plus_index")["tools"]}
+        e = {t["name"]: t for t in resolve(self.policy, "baseline_plus_index_encouraged")["tools"]}
+        self.assertEqual(set(n), set(e))
+        diffs = {k for k in n if n[k] != e[k]}
+        self.assertEqual(diffs, {"index_query"})
+        self.assertEqual(n["index_query"]["description_style"], "neutral")
+        self.assertEqual(e["index_query"]["description_style"], "encouraged")
+
+    def test_baseline_has_no_style(self):
+        eff, prompt = self._prompt("baseline")
+        names = {t["name"] for t in eff["tools"]}
+        self.assertNotIn("index_query", names)
+        self.assertNotIn("index_query", prompt.system_template)
+
+
 if __name__ == "__main__":
     unittest.main()
