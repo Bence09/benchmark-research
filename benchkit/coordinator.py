@@ -148,7 +148,8 @@ class Coordinator:
             ["docker", "image", "inspect", env_spec.image, "--format", "{{.Id}}"],
             text=True).strip()
 
-        root = Path(runs_root) if runs_root else (Path(__file__).resolve().parent.parent / "runs")
+        root = (Path(runs_root).expanduser() if runs_root
+                else (Path(__file__).resolve().parent.parent / "runs"))
         label = (time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-" +
                  (plan.condition or "default") + "-" + uuid.uuid4().hex[:8])
         out = root / label

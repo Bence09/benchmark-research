@@ -35,7 +35,8 @@ def _run_one(condition, args):
     plan = coord.plan(prepared, str(args.policy), condition,
                       top_k=args.top_k, build_index=bm25_build_index)
     return coord.execute(plan, prepared, model=args.model, steps=args.steps,
-                         output_tokens=args.output_tokens, wall_seconds=args.wall_seconds)
+                         output_tokens=args.output_tokens, wall_seconds=args.wall_seconds,
+                         runs_root=getattr(args, "runs_root", None))
 
 
 def cmd_run(args):
@@ -46,14 +47,52 @@ def cmd_run(args):
 
 def cmd_demo(args):
     dirs = []
-    for condition in ("baseline", "baseline_plus_index"):
+    for condition in args.conditions:
         print(f"\n=== condition: {condition} ===")
-        dirs.append(_run_one(condition, args))
-    return _emit(dirs, ROOT / "runs" / "sweep")
+        run_dir = _run_one(condition, args)
+        # Score each run before joining so the sweep carries native_score.
+        # Best-effort: a run that did not submit validly is still joined (null score).
+        try:
+            _score_run(run_dir, args.evaluator_source)
+        except Exception as exc:
+            print(f"  (scoring skipped for {run_dir.name}: {exc})")
+        dirs.append(run_dir)
+    sweep_root = Path(args.runs_root).expanduser() if args.runs_root else (ROOT / "runs")
+    return _emit(dirs, sweep_root / "sweep")
 
 
 def cmd_join(args):
     return _emit([Path(d) for d in args.run_dirs], Path(args.out))
+
+
+def _score_run(run_dir, evaluator_source):
+    """Grade a finished run's parsed submission; write scores.json. Returns the result."""
+    import json
+
+    from benchkit.contract import Submission
+
+    run_dir = Path(run_dir)
+    parsed_path = run_dir / "submission.parsed.json"
+    if not parsed_path.exists():
+        raise SystemExit(f"No parsed submission in {run_dir} (run did not submit validly).")
+    manifest = json.loads((run_dir / "manifest.json").read_text())
+    prepared = load_prepared(manifest["prepared_dir"], top_k=manifest.get("top_k", 5))
+    parsed = json.loads(parsed_path.read_text())
+    sub = Submission(kind=parsed["kind"], payload=parsed["payload"])
+
+    result = SweExploreAdapter().evaluate(prepared, sub, evaluator_source=evaluator_source)
+    (run_dir / "scores.json").write_text(json.dumps(result, indent=2) + "\n")
+    print("Scored:", run_dir / "scores.json")
+    print("  f1_score =", result["scores"].get("f1_score"),
+          " precision =", result["scores"].get("precision"),
+          " recall =", result["scores"].get("recall"))
+    return result
+
+
+def cmd_score(args):
+    """Grade a finished run's parsed submission with the pinned SWE-Explore scorer."""
+    _score_run(args.run_dir, args.evaluator_source)
+    return 0
 
 
 def _emit(run_dirs, out_prefix):
@@ -87,13 +126,21 @@ def main():
         sp.add_argument("--steps", type=int, default=30)
         sp.add_argument("--output-tokens", type=int, default=2048)
         sp.add_argument("--wall-seconds", type=int, default=3600)
+        sp.add_argument("--runs-root", default=None,
+                        help="where to write run dirs; use a WSL Linux path (e.g. ~/bench-runs) "
+                             "to avoid /mnt/c write errors (Errno 5). Default: ./runs")
 
     r = sub.add_parser("run", help="run a single condition")
     r.add_argument("--condition", default="baseline")
     common(r)
     r.set_defaults(func=cmd_run)
 
-    d = sub.add_parser("demo", help="run baseline then baseline_plus_index, then join")
+    d = sub.add_parser("demo", help="run conditions, score each, then join into a sweep")
+    d.add_argument("--conditions", nargs="+",
+                   default=["baseline", "baseline_plus_index"],
+                   help="condition names to run in order (default: baseline, baseline_plus_index)")
+    d.add_argument("--evaluator-source", default=None,
+                   help="path to the pinned SWE-Explore scorer (default: explore-evaluator-src)")
     common(d)
     d.set_defaults(func=cmd_demo)
 
@@ -101,6 +148,12 @@ def main():
     j.add_argument("run_dirs", nargs="+")
     j.add_argument("--out", default="runs/sweep")
     j.set_defaults(func=cmd_join)
+
+    s = sub.add_parser("score", help="grade a finished run's submission (no model calls)")
+    s.add_argument("run_dir")
+    s.add_argument("--evaluator-source", default=None,
+                   help="path to the pinned SWE-Explore scorer (default: explore-evaluator-src)")
+    s.set_defaults(func=cmd_score)
 
     args = p.parse_args()
     return args.func(args)

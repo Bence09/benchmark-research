@@ -199,14 +199,18 @@ class TestNudgeStyle(unittest.TestCase):
         eff, prompt = self._prompt("baseline_plus_index")
         idx = next(t for t in eff["tools"] if t["name"] == "index_query")
         self.assertEqual(idx["description_style"], "neutral")
-        self.assertNotIn("Prefer starting with", prompt.system_template)
         self.assertIn("index_query", prompt.system_template)
+        # neutral presents the tool as optional
+        self.assertIn("optional", prompt.system_template)
+        self.assertNotIn("at least once", prompt.system_template)
 
     def test_encouraged_adds_nudge_text(self):
         eff, prompt = self._prompt("baseline_plus_index_encouraged")
         idx = next(t for t in eff["tools"] if t["name"] == "index_query")
         self.assertEqual(idx["description_style"], "encouraged")
-        self.assertIn("Prefer starting with", prompt.system_template)
+        # encouraged directs usage rather than presenting it as optional
+        self.assertIn("at least once", prompt.system_template)
+        self.assertNotIn("It is optional", prompt.system_template)
 
     def test_nudge_is_only_difference(self):
         from toolpolicy import resolve
