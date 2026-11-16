@@ -12,6 +12,7 @@ touches the index tool (R5).
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -106,7 +107,7 @@ def _append_index_mounts(env, serialized_index: Path) -> None:
 
 
 class Coordinator:
-    """Thin wrapper; the live execute() is wired but not exercised offline."""
+    """Plans runs offline; `execute()` drives mini in Docker (live step)."""
 
     def __init__(self, adapter):
         self.adapter = adapter
@@ -114,10 +115,128 @@ class Coordinator:
     def plan(self, prepared, policy_file, condition, **kw) -> RunPlan:
         return plan_run(self.adapter, prepared, policy_file, condition, **kw)
 
-    def execute(self, plan: RunPlan, prepared):  # pragma: no cover - live Docker/API
-        raise NotImplementedError(
-            "Live execution: construct mini DockerEnvironment from plan.env, run "
-            "DefaultAgent with plan.prompt, parse via adapter.parse_submission, "
-            "evaluate via adapter.evaluate. Mirrors oracle explore.py run(); needs "
-            "Docker + OPENAI_API_KEY (E3 live step, not run in authoring)."
+    def execute(self, plan: "RunPlan", prepared, *, model="large", steps=30,
+                output_tokens=2048, wall_seconds=3600, runs_root=None):
+        """Run one condition end to end: mini in Docker -> parse -> grade -> persist.
+
+        Mirrors the oracle explore.py run() (verified baseline) but is driven by the
+        RunPlan and the adapter, so baseline and baseline+index share one code path.
+        Needs Docker running and OPENAI_API_KEY set. Returns the run directory.
+        """
+        import argparse
+        import json
+        import subprocess
+        import time
+        import uuid
+        import os
+
+        import bench  # oracle: reused only for shared model config + token accounting
+        from minisweagent.agents.default import DefaultAgent
+        from minisweagent.environments.docker import DockerEnvironment
+        from minisweagent.models import get_model
+
+        from metrics import read_metrics
+
+        if not os.environ.get("OPENAI_API_KEY"):
+            raise SystemExit("Set OPENAI_API_KEY in your shell first.")
+
+        env_spec = plan.env
+        # Confirm Docker and pin the image by resolved ID (provenance, R9).
+        subprocess.run(["docker", "info"], stdout=subprocess.DEVNULL, check=True)
+        subprocess.run(["docker", "pull", env_spec.image], check=True)
+        image_id = subprocess.check_output(
+            ["docker", "image", "inspect", env_spec.image, "--format", "{{.Id}}"],
+            text=True).strip()
+
+        root = Path(runs_root) if runs_root else (Path(__file__).resolve().parent.parent / "runs")
+        label = (time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-" +
+                 (plan.condition or "default") + "-" + uuid.uuid4().hex[:8])
+        out = root / label
+        out.mkdir(parents=True)
+
+        # Shared model/connection config + token accounting from the oracle.
+        settings = argparse.Namespace(interface="tools", model=model, steps=steps,
+                                      output_tokens=output_tokens)
+        cfg = bench.config(settings)
+        agent_cfg = cfg["agent"]
+        agent_cfg.update(
+            system_template=plan.prompt.system_template,
+            instance_template=plan.prompt.instance_template,
+            output_path=out / "trajectory.traj.json",
+            wall_time_limit_seconds=wall_seconds,
         )
+
+        # Make `index_query` callable by name when the policy added it: a PATH shim
+        # sourced per bash invocation via BASH_ENV (same mechanism the oracle uses).
+        container_env = dict(cfg["environment"].get("env", {}))
+        if _policy_adds_index(plan.effective_policy):
+            shim = "/tmp/.index_shim"
+            container_env["BASH_ENV"] = shim
+            _write_shim_bootstrap(env_spec, shim)
+
+        env_cfg = dict(
+            image=image_id, cwd=env_spec.cwd, timeout=env_spec.timeout,
+            pull_timeout=env_spec.pull_timeout, interpreter=env_spec.interpreter,
+            run_args=env_spec.run_args, env=container_env,
+            container_timeout=f"{wall_seconds + 300}s",
+        )
+
+        manifest = {**plan.manifest, "image_id": image_id, "model": bench.MODEL_NAMES[model],
+                    "steps": steps, "output_tokens_per_call": output_tokens,
+                    "wall_time_limit_seconds": wall_seconds,
+                    "prepared_dir": str(prepared.prepared_dir)}
+        (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+        print("Run directory:", out, flush=True)
+        print(plan.summary, flush=True)
+
+        env = agent = None
+        started = time.monotonic()
+        info = {"exit_status": "SetupError", "submission": ""}
+        try:
+            env = DockerEnvironment(**env_cfg)
+            agent = DefaultAgent(get_model(config=cfg["model"]), env, **agent_cfg)
+            info = agent.run(prepared.task["problem_statement"],
+                             top_k=plan.manifest.get("top_k", 5))
+            (out / "submission.txt").write_text(info.get("submission") or "")
+            if info.get("exit_status") in ("Submitted", "Completed"):
+                sub = self.adapter.parse_submission(info["submission"], prepared)
+                (out / "submission.parsed.json").write_text(
+                    json.dumps({"kind": sub.kind, "payload": sub.payload}, indent=2) + "\n")
+            else:
+                print("No valid submission:", info.get("exit_status"))
+        finally:
+            if agent is not None:
+                traj = agent.save(out / "trajectory.traj.json",
+                                  {"info": info, "instance_id": prepared.instance_id})
+                merged = {**bench.metrics(traj), **read_metrics(traj),
+                          "exit_status": info.get("exit_status"),
+                          "wall_seconds": time.monotonic() - started,
+                          "valid_regions_saved": (out / "submission.parsed.json").exists()}
+                (out / "metrics.json").write_text(json.dumps(merged, indent=2) + "\n")
+            if env is not None:
+                cleanup = getattr(env, "cleanup", None)
+                if cleanup:
+                    cleanup()
+        return out
+
+
+def _write_shim_bootstrap(env_spec, shim_path: str) -> None:
+    """Mount a tiny bootstrap that defines the `index_query` shell function.
+
+    The function forwards to the mounted pure-Python CLI. Defined via BASH_ENV so it
+    exists in every non-interactive bash the agent spawns. Mounted read-only; the
+    lockdown flags are untouched (R11).
+    """
+    import tempfile
+
+    bootstrap = (
+        "index_query() { python3 %s \"$@\"; }\n"
+        "export -f index_query\n" % INDEX_TOOL_DST
+    )
+    fd = tempfile.NamedTemporaryFile("w", suffix=".index_shim", delete=False)
+    fd.write(bootstrap)
+    fd.close()
+    env_spec.run_args += [
+        "--mount", f"type=bind,src={fd.name},dst={shim_path},readonly",
+    ]
+    env_spec.mounts.append({"src": fd.name, "dst": shim_path, "readonly": True})
