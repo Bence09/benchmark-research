@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 
-spec = importlib.util.spec_from_file_location("bench", Path(__file__).parents[1] / "bench.py")
+spec = importlib.util.spec_from_file_location("bench", Path(__file__).parents[1] / "oracle" / "bench.py")
 bench = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bench)
 HAS_MINI = importlib.util.find_spec("minisweagent") is not None

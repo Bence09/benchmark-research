@@ -130,7 +130,7 @@ class Coordinator:
         import uuid
         import os
 
-        import bench  # oracle: reused only for shared model config + token accounting
+        from benchkit import model_config
         from minisweagent.agents.default import DefaultAgent
         from minisweagent.models import get_model
 
@@ -151,7 +151,7 @@ class Coordinator:
         # Shared model/connection config + token accounting from the oracle.
         settings = argparse.Namespace(interface="tools", model=model, steps=steps,
                                       output_tokens=output_tokens)
-        cfg = bench.config(settings)
+        cfg = model_config.config(settings)
         agent_cfg = cfg["agent"]
         agent_cfg.update(
             system_template=plan.prompt.system_template,
@@ -174,7 +174,7 @@ class Coordinator:
         env, env_manifest = self.adapter.make_environment(
             prepared, plan, cfg, wall_seconds=wall_seconds, index_env=index_env)
 
-        manifest = {**plan.manifest, **env_manifest, "model": bench.MODEL_NAMES[model],
+        manifest = {**plan.manifest, **env_manifest, "model": model_config.MODEL_NAMES[model],
                     "steps": steps, "output_tokens_per_call": output_tokens,
                     "wall_time_limit_seconds": wall_seconds,
                     "prepared_dir": str(prepared.prepared_dir)}
@@ -200,7 +200,7 @@ class Coordinator:
             if agent is not None:
                 traj = agent.save(out / "trajectory.traj.json",
                                   {"info": info, "instance_id": prepared.instance_id})
-                merged = {**bench.metrics(traj), **read_metrics(traj),
+                merged = {**model_config.metrics(traj), **read_metrics(traj),
                           "exit_status": info.get("exit_status"),
                           "wall_seconds": time.monotonic() - started,
                           "valid_regions_saved": (out / "submission.parsed.json").exists()}

@@ -5,7 +5,10 @@ from pathlib import Path
 import tempfile
 import unittest
 
-import repobench_api as runner
+import importlib.util as _ilu
+_spec = _ilu.spec_from_file_location("repobench_api", Path(__file__).parents[1] / "oracle" / "repobench_api.py")
+runner = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(runner)
 
 
 @unittest.skipUnless(os.environ.get("REPOBENCH_SOURCE"), "Set REPOBENCH_SOURCE to your official checkout")

@@ -7,7 +7,12 @@ import tarfile
 import tempfile
 import unittest
 
-from explore import parse_regions, unpack_snapshot, select_record, METRICS
+import importlib.util as _ilu
+_spec = _ilu.spec_from_file_location("explore", Path(__file__).parents[1] / "oracle" / "explore.py")
+_explore = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_explore)
+parse_regions, unpack_snapshot, select_record, METRICS = (
+    _explore.parse_regions, _explore.unpack_snapshot, _explore.select_record, _explore.METRICS)
 
 
 class AdapterTests(unittest.TestCase):
