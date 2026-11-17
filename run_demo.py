@@ -1,37 +1,100 @@
 #!/usr/bin/env python3
-"""Live demo runner for the tool-policy benchmark (E3 execute + E4 join).
+"""Live demo runner for the tool-policy benchmark framework.
 
-Runs one or both conditions on the already-prepared SWE-Explore task, then joins
-the run dirs into Prometheus + CSV metrics. Needs Docker running and
-OPENAI_API_KEY set in the shell.
+Illustrates the intended framework usage: pick a benchmark, pick a condition, run.
+The benchmark is a parameter (--benchmark); everything else (policy resolution,
+index build, execution, scoring, metrics join) is benchmark-agnostic. Needs Docker
+running and OPENAI_API_KEY set in the shell.
 
 Examples:
-    # one condition
-    python run_demo.py run --condition baseline
-    python run_demo.py run --condition baseline_plus_index
+    # SWE-Explore localization (default)
+    python run_demo.py run  --benchmark swe-explore --condition baseline
+    python run_demo.py demo --benchmark swe-explore
 
-    # both conditions back to back, then emit joined metrics
-    python run_demo.py demo
+    # SWE-bench repair
+    python run_demo.py run  --benchmark swe-bench --condition swebench_baseline
+    python run_demo.py demo --benchmark swe-bench \\
+        --conditions swebench_baseline swebench_plus_index
 
-    # join existing run dirs only (no model calls)
-    python run_demo.py join runs/<dir-a> runs/<dir-b> --out runs/sweep
+    # join / score existing run dirs (no model calls)
+    python run_demo.py join <dir-a> <dir-b> --out runs/sweep
+    python run_demo.py score <run-dir> --benchmark swe-bench
 """
 
 import argparse
+import json
 from pathlib import Path
 
 from benchkit import Coordinator
+from benchkit.contract import Submission
 from benchkit.load_prepared import load_prepared, bm25_build_index
 from benchkit.swe_explore_adapter import SweExploreAdapter
+from benchkit.swe_bench_adapter import SweBenchAdapter
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_PREPARED = ROOT / "explore-input" / "xarray-4629"
 DEFAULT_POLICY = ROOT / "conditions" / "config.yaml"
 
 
-def _run_one(condition, args):
-    prepared = load_prepared(args.prepared, top_k=args.top_k)
-    coord = Coordinator(SweExploreAdapter())
+# --- per-benchmark registry: the only place benchmarks differ in this runner ---
+
+def _prepare_swe_explore(args):
+    # Pre-prepared on disk (explore.py prepare). Loaded into a PreparedTask.
+    return load_prepared(args.prepared or (ROOT / "explore-input" / "xarray-4629"),
+                         top_k=args.top_k)
+
+
+def _prepare_swe_bench(args):
+    # prepare from an instance_id (downloads record, host-only grading, sanitized task).
+    out = Path(args.prepared) if args.prepared else (ROOT / "swebench-input" / args.instance)
+    if out.exists():
+        # already prepared: load task + preparation without re-downloading
+        return _load_swebench_prepared(out)
+    return SweBenchAdapter().prepare({"instance_id": args.instance, "output_dir": str(out)})
+
+
+def _load_swebench_prepared(out: Path):
+    from benchkit.contract import PreparedTask
+    task = json.loads((out / "task.json").read_text())
+    prep = json.loads((out / "preparation.json").read_text())
+    return PreparedTask(instance_id=task["instance_id"], prepared_dir=out, repo_dir=out,
+                        grading_path=out / "selected-task.grading.json", task=task, preparation=prep)
+
+
+def _score_swe_explore(run_dir, prepared, sub, args):
+    res = SweExploreAdapter().evaluate(prepared, sub, evaluator_source=args.evaluator_source)
+    print("  f1 =", res["scores"].get("f1_score"),
+          " precision =", res["scores"].get("precision"),
+          " recall =", res["scores"].get("recall"))
+    return res
+
+
+def _score_swe_bench(run_dir, prepared, sub, args):
+    res = SweBenchAdapter().evaluate(prepared, sub, evaluator_python=args.evaluator_python,
+                                     run_dir=run_dir)
+    print("  resolved =", res.get("resolved"), " exit =", res.get("evaluator_exit_code"))
+    return res
+
+
+BENCHMARKS = {
+    "swe-explore": {
+        "adapter": SweExploreAdapter,
+        "prepare": _prepare_swe_explore,
+        "score": _score_swe_explore,
+        "default_conditions": ["baseline", "baseline_plus_index"],
+    },
+    "swe-bench": {
+        "adapter": SweBenchAdapter,
+        "prepare": _prepare_swe_bench,
+        "score": _score_swe_bench,
+        "default_conditions": ["swebench_baseline", "swebench_plus_index"],
+    },
+}
+
+
+# --- benchmark-agnostic command logic ---
+
+def _run_one(condition, args, prepared):
+    coord = Coordinator(BENCHMARKS[args.benchmark]["adapter"]())
     plan = coord.plan(prepared, str(args.policy), condition,
                       top_k=args.top_k, build_index=bm25_build_index)
     return coord.execute(plan, prepared, model=args.model, steps=args.steps,
@@ -40,20 +103,22 @@ def _run_one(condition, args):
 
 
 def cmd_run(args):
-    out = _run_one(args.condition, args)
+    prepared = BENCHMARKS[args.benchmark]["prepare"](args)
+    out = _run_one(args.condition, args, prepared)
     print("Done:", out)
     return 0
 
 
 def cmd_demo(args):
+    bm = BENCHMARKS[args.benchmark]
+    prepared = bm["prepare"](args)
+    conditions = args.conditions or bm["default_conditions"]
     dirs = []
-    for condition in args.conditions:
-        print(f"\n=== condition: {condition} ===")
-        run_dir = _run_one(condition, args)
-        # Score each run before joining so the sweep carries native_score.
-        # Best-effort: a run that did not submit validly is still joined (null score).
+    for condition in conditions:
+        print(f"\n=== {args.benchmark} / {condition} ===")
+        run_dir = _run_one(condition, args, prepared)
         try:
-            _score_run(run_dir, args.evaluator_source)
+            _score_run(run_dir, args, prepared)
         except Exception as exc:
             print(f"  (scoring skipped for {run_dir.name}: {exc})")
         dirs.append(run_dir)
@@ -61,38 +126,31 @@ def cmd_demo(args):
     return _emit(dirs, sweep_root / "sweep")
 
 
-def cmd_join(args):
-    return _emit([Path(d) for d in args.run_dirs], Path(args.out))
-
-
-def _score_run(run_dir, evaluator_source):
-    """Grade a finished run's parsed submission; write scores.json. Returns the result."""
-    import json
-
-    from benchkit.contract import Submission
-
+def _score_run(run_dir, args, prepared=None):
     run_dir = Path(run_dir)
     parsed_path = run_dir / "submission.parsed.json"
     if not parsed_path.exists():
         raise SystemExit(f"No parsed submission in {run_dir} (run did not submit validly).")
-    manifest = json.loads((run_dir / "manifest.json").read_text())
-    prepared = load_prepared(manifest["prepared_dir"], top_k=manifest.get("top_k", 5))
+    if prepared is None:
+        manifest = json.loads((run_dir / "manifest.json").read_text())
+        prepared = BENCHMARKS[args.benchmark]["prepare"](
+            argparse.Namespace(prepared=manifest.get("prepared_dir"),
+                               instance=manifest.get("instance_id"), top_k=manifest.get("top_k", 5)))
     parsed = json.loads(parsed_path.read_text())
     sub = Submission(kind=parsed["kind"], payload=parsed["payload"])
-
-    result = SweExploreAdapter().evaluate(prepared, sub, evaluator_source=evaluator_source)
-    (run_dir / "scores.json").write_text(json.dumps(result, indent=2) + "\n")
+    res = BENCHMARKS[args.benchmark]["score"](run_dir, prepared, sub, args)
+    (run_dir / "scores.json").write_text(json.dumps(res, indent=2) + "\n")
     print("Scored:", run_dir / "scores.json")
-    print("  f1_score =", result["scores"].get("f1_score"),
-          " precision =", result["scores"].get("precision"),
-          " recall =", result["scores"].get("recall"))
-    return result
+    return res
 
 
 def cmd_score(args):
-    """Grade a finished run's parsed submission with the pinned SWE-Explore scorer."""
-    _score_run(args.run_dir, args.evaluator_source)
+    _score_run(args.run_dir, args)
     return 0
+
+
+def cmd_join(args):
+    return _emit([Path(d) for d in args.run_dirs], Path(args.out))
 
 
 def _emit(run_dirs, out_prefix):
@@ -106,9 +164,8 @@ def _emit(run_dirs, out_prefix):
     print("Wrote:", out_prefix.with_suffix(".prom"), "and", out_prefix.with_suffix(".csv"))
     for r in rows:
         cond = r.get("condition") or "(unlabeled)"
-        print(f"  {cond:20} score={r.get('native_score')} "
+        print(f"  {cond:24} score={r.get('native_score')} "
               f"lines_read={r.get('lines_read_total')} "
-              f"index_build_s={r.get('index_build_seconds')} "
               f"failure={r.get('failure_category')}")
     return 0
 
@@ -119,7 +176,11 @@ def main():
     sub = p.add_subparsers(dest="command", required=True)
 
     def common(sp):
-        sp.add_argument("--prepared", default=str(DEFAULT_PREPARED))
+        sp.add_argument("--benchmark", choices=tuple(BENCHMARKS), default="swe-explore")
+        sp.add_argument("--prepared", default=None,
+                        help="prepared dir (default: per-benchmark)")
+        sp.add_argument("--instance", default="astropy__astropy-12907",
+                        help="instance id for benchmarks that prepare from a dataset (swe-bench)")
         sp.add_argument("--policy", default=str(DEFAULT_POLICY))
         sp.add_argument("--model", choices=("small", "large"), default="large")
         sp.add_argument("--top-k", type=int, default=5)
@@ -128,7 +189,11 @@ def main():
         sp.add_argument("--wall-seconds", type=int, default=3600)
         sp.add_argument("--runs-root", default=None,
                         help="where to write run dirs; use a WSL Linux path (e.g. ~/bench-runs) "
-                             "to avoid /mnt/c write errors (Errno 5). Default: ./runs")
+                             "to avoid /mnt/c write errors. Default: ./runs")
+        sp.add_argument("--evaluator-source", default=None,
+                        help="SWE-Explore scorer path (default: explore-evaluator-src)")
+        sp.add_argument("--evaluator-python", default=None,
+                        help="SWE-bench harness python (default: .venv-eval/bin/python)")
 
     r = sub.add_parser("run", help="run a single condition")
     r.add_argument("--condition", default="baseline")
@@ -136,11 +201,8 @@ def main():
     r.set_defaults(func=cmd_run)
 
     d = sub.add_parser("demo", help="run conditions, score each, then join into a sweep")
-    d.add_argument("--conditions", nargs="+",
-                   default=["baseline", "baseline_plus_index"],
-                   help="condition names to run in order (default: baseline, baseline_plus_index)")
-    d.add_argument("--evaluator-source", default=None,
-                   help="path to the pinned SWE-Explore scorer (default: explore-evaluator-src)")
+    d.add_argument("--conditions", nargs="*", default=None,
+                   help="condition names (default: per-benchmark baseline + index)")
     common(d)
     d.set_defaults(func=cmd_demo)
 
@@ -151,8 +213,7 @@ def main():
 
     s = sub.add_parser("score", help="grade a finished run's submission (no model calls)")
     s.add_argument("run_dir")
-    s.add_argument("--evaluator-source", default=None,
-                   help="path to the pinned SWE-Explore scorer (default: explore-evaluator-src)")
+    common(s)
     s.set_defaults(func=cmd_score)
 
     args = p.parse_args()

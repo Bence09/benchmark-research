@@ -53,6 +53,13 @@ class TestPatchParsing(unittest.TestCase):
         self.assertEqual(sub.kind, "patch")
         self.assertIn("diff --git", sub.payload)
 
+    def test_sentinel_prefixed_submission_is_stripped(self):
+        # Realistic submit output: `echo SENTINEL && cat patch.txt`
+        raw = "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\n" + SAMPLE_PATCH
+        sub = self.a.parse_submission(raw, _prepared())
+        self.assertTrue(sub.payload.startswith("diff --git"))
+        self.assertNotIn("COMPLETE_TASK", sub.payload)
+
     def test_non_diff_rejected(self):
         with self.assertRaises(ValueError):
             self.a.parse_submission("I think the fix is in separable.py", _prepared())

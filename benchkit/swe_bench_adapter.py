@@ -30,12 +30,23 @@ SPLIT = "test"
 # independent of our run environment.
 DEFAULT_EVALUATOR_PYTHON = Path(__file__).resolve().parent.parent / ".venv-eval" / "bin" / "python"
 
-# Repair submission is a unified diff. mini's swebench config asks the agent to end
-# with a patch; we keep the prompt close to mini's builtin repair wiring.
+# Repair submission protocol, kept visible in our code (not hidden in mini's builtin
+# config). The agent writes its git diff to patch.txt, verifies it, then finishes with
+# the exact sentinel command. mini detects COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT in the
+# output, marks the run Submitted, and the submission stdout is the patch (from the real
+# `git diff`, never hand-typed). Sentinel is the one mini's model already recognizes.
 SYSTEM = """You are a software engineer fixing a bug in a repository checked out at /testbed.
 Use the bash tool to inspect, edit and verify code. Make the minimal change that fixes
-the issue described. {{tool_descriptions}}When done, ensure your fix is written to the
-working tree; the harness will run the hidden tests. Do not edit tests.
+the issue described. Do not edit tests. {{tool_descriptions}}
+
+When your fix is complete, submit in three separate commands (do NOT combine with &&):
+  1. Write your patch:    cd /testbed && git add -A && git diff --cached > patch.txt
+  2. Verify it:           cat patch.txt      (confirm only your intended changes, with
+                          `--- a/` and `+++ b/` headers)
+  3. Submit (EXACT):      echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT && cat patch.txt
+
+The first stdout line of the submit command must be the sentinel. Submit before your
+step budget runs out. You cannot continue working after submitting.
 """
 
 INSTANCE_TEMPLATE = "ISSUE:\n{{task}}\nFix it within {{step_limit}} model calls."
@@ -88,11 +99,22 @@ class SweBenchAdapter:
                      "mounts": index_env.get("run_args", [])}
 
     def parse_submission(self, text: str, prepared: PreparedTask) -> Submission:
-        """A repair submission is a unified diff (the model patch)."""
-        patch = text or ""
-        if "diff --git" not in patch:
-            raise ValueError("Submission is not a unified diff (no 'diff --git').")
-        return Submission(kind="patch", payload=patch)
+        """Extract the unified diff from the submit output.
+
+        The submit command is `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT && cat
+        patch.txt`, so the submission is the sentinel line followed by the patch
+        (produced by a real `git diff`, not hand-typed). Strip the sentinel; the
+        remainder is the patch. An empty patch is a recorded failure, not a crash.
+        """
+        raw = text or ""
+        SENTINEL = "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"
+        if SENTINEL in raw:
+            raw = raw.split(SENTINEL, 1)[1]
+        if "diff --git" not in raw:
+            raise ValueError("Submission contains no unified diff (empty or invalid patch).")
+        # Keep from the first real diff header onward (drop any leading prose/sentinel).
+        patch = raw[raw.index("diff --git"):].strip("\n")
+        return Submission(kind="patch", payload=patch + "\n")
 
     def prepare(self, spec: dict) -> PreparedTask:  # pragma: no cover - live path
         """Select one Lite instance; keep gold fields host-only; save sanitized task.
