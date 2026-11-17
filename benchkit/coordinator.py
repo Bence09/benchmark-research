@@ -132,7 +132,6 @@ class Coordinator:
 
         import bench  # oracle: reused only for shared model config + token accounting
         from minisweagent.agents.default import DefaultAgent
-        from minisweagent.environments.docker import DockerEnvironment
         from minisweagent.models import get_model
 
         from metrics import read_metrics
@@ -140,13 +139,7 @@ class Coordinator:
         if not os.environ.get("OPENAI_API_KEY"):
             raise SystemExit("Set OPENAI_API_KEY in your shell first.")
 
-        env_spec = plan.env
-        # Confirm Docker and pin the image by resolved ID (provenance, R9).
         subprocess.run(["docker", "info"], stdout=subprocess.DEVNULL, check=True)
-        subprocess.run(["docker", "pull", env_spec.image], check=True)
-        image_id = subprocess.check_output(
-            ["docker", "image", "inspect", env_spec.image, "--format", "{{.Id}}"],
-            text=True).strip()
 
         root = (Path(runs_root).expanduser() if runs_root
                 else (Path(__file__).resolve().parent.parent / "runs"))
@@ -167,22 +160,21 @@ class Coordinator:
             wall_time_limit_seconds=wall_seconds,
         )
 
-        # Make `index_query` callable by name when the policy added it: a PATH shim
-        # sourced per bash invocation via BASH_ENV (same mechanism the oracle uses).
-        container_env = dict(cfg["environment"].get("env", {}))
+        # Index wiring is benchmark-agnostic: when the policy adds index_query, the
+        # coordinator prepares the BASH_ENV shim; the adapter merges index_env into
+        # whatever environment it builds (R5 -- the index tool never depends on the
+        # benchmark, and vice versa).
+        index_env = {"env": {}, "run_args": []}
         if _policy_adds_index(plan.effective_policy):
             shim = "/tmp/.index_shim"
-            container_env["BASH_ENV"] = shim
-            _write_shim_bootstrap(env_spec, shim)
+            index_env["env"]["BASH_ENV"] = shim
+            _write_shim_bootstrap_into(index_env, shim)
 
-        env_cfg = dict(
-            image=image_id, cwd=env_spec.cwd, timeout=env_spec.timeout,
-            pull_timeout=env_spec.pull_timeout, interpreter=env_spec.interpreter,
-            run_args=env_spec.run_args, env=container_env,
-            container_timeout=f"{wall_seconds + 300}s",
-        )
+        # Option 1 (E5-A): the adapter owns environment construction.
+        env, env_manifest = self.adapter.make_environment(
+            prepared, plan, cfg, wall_seconds=wall_seconds, index_env=index_env)
 
-        manifest = {**plan.manifest, "image_id": image_id, "model": bench.MODEL_NAMES[model],
+        manifest = {**plan.manifest, **env_manifest, "model": bench.MODEL_NAMES[model],
                     "steps": steps, "output_tokens_per_call": output_tokens,
                     "wall_time_limit_seconds": wall_seconds,
                     "prepared_dir": str(prepared.prepared_dir)}
@@ -190,11 +182,10 @@ class Coordinator:
         print("Run directory:", out, flush=True)
         print(plan.summary, flush=True)
 
-        env = agent = None
+        agent = None
         started = time.monotonic()
         info = {"exit_status": "SetupError", "submission": ""}
         try:
-            env = DockerEnvironment(**env_cfg)
             agent = DefaultAgent(get_model(config=cfg["model"]), env, **agent_cfg)
             info = agent.run(prepared.task["problem_statement"],
                              top_k=plan.manifest.get("top_k", 5))
@@ -221,12 +212,10 @@ class Coordinator:
         return out
 
 
-def _write_shim_bootstrap(env_spec, shim_path: str) -> None:
-    """Mount a tiny bootstrap that defines the `index_query` shell function.
-
-    The function forwards to the mounted pure-Python CLI. Defined via BASH_ENV so it
-    exists in every non-interactive bash the agent spawns. Mounted read-only; the
-    lockdown flags are untouched (R11).
+def _write_shim_bootstrap_into(index_env: dict, shim_path: str) -> None:
+    """Write the `index_query` shell-function bootstrap and add its read-only mount
+    to index_env. The adapter merges index_env["run_args"]/["env"] into whatever
+    environment it builds. Mounted read-only; lockdown flags untouched (R11).
     """
     import tempfile
 
@@ -237,7 +226,6 @@ def _write_shim_bootstrap(env_spec, shim_path: str) -> None:
     fd = tempfile.NamedTemporaryFile("w", suffix=".index_shim", delete=False)
     fd.write(bootstrap)
     fd.close()
-    env_spec.run_args += [
+    index_env["run_args"] += [
         "--mount", f"type=bind,src={fd.name},dst={shim_path},readonly",
     ]
-    env_spec.mounts.append({"src": fd.name, "dst": shim_path, "readonly": True})

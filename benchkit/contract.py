@@ -73,6 +73,18 @@ class BenchmarkAdapter(Protocol):
 
     def container_spec(self, prepared: PreparedTask, policy: dict) -> EnvSpec: ...
 
+    def make_environment(self, prepared: "PreparedTask", plan, cfg: dict,
+                         *, wall_seconds: int, index_env: dict) -> tuple:
+        """Construct and return (mini_environment, env_manifest_dict).
+
+        E5-A extension point (Option 1): each benchmark owns how its container is
+        built. SWE-Explore builds a locked-down DockerEnvironment from its EnvSpec;
+        SWE-bench repair calls mini's get_sb_environment to resolve the task's
+        installed image. `index_env` carries the index mounts/BASH_ENV shim the
+        coordinator prepared when the policy added index_query (benchmark-agnostic).
+        """
+        ...
+
     def parse_submission(self, text: str, prepared: PreparedTask) -> Submission: ...
 
     def evaluate(self, prepared: PreparedTask, submission: Submission) -> dict: ...

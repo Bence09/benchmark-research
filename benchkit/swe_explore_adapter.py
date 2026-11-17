@@ -70,6 +70,34 @@ class SweExploreAdapter:
         return EnvSpec(image="python:3.12-slim", cwd="/repo", run_args=run_args,
                        timeout=60, pull_timeout=120, mounts=mounts)
 
+    def make_environment(self, prepared: PreparedTask, plan, cfg: dict,
+                         *, wall_seconds: int, index_env: dict):
+        """Build the locked-down read-only DockerEnvironment (prior verified behavior).
+
+        Pull + pin the tools image, start mini's DockerEnvironment from the EnvSpec
+        run_args, merge the coordinator's index_env (mounts + BASH_ENV shim) when the
+        policy added index_query. Returns (env, env_manifest).
+        """
+        import subprocess
+        from minisweagent.environments.docker import DockerEnvironment
+
+        spec = plan.env  # EnvSpec from container_spec(), already incl. any index mount
+        subprocess.run(["docker", "pull", spec.image], check=True)
+        image_id = subprocess.check_output(
+            ["docker", "image", "inspect", spec.image, "--format", "{{.Id}}"],
+            text=True).strip()
+
+        run_args = list(spec.run_args) + list(index_env.get("run_args", []))
+        container_env = {**(cfg.get("environment", {}).get("env", {})),
+                         **index_env.get("env", {})}
+        env = DockerEnvironment(
+            image=image_id, cwd=spec.cwd, timeout=spec.timeout,
+            pull_timeout=spec.pull_timeout, interpreter=spec.interpreter,
+            run_args=run_args, env=container_env,
+            container_timeout=f"{wall_seconds + 300}s",
+        )
+        return env, {"image": spec.image, "image_id": image_id, "mounts": spec.mounts}
+
     def parse_submission(self, text: str, prepared: PreparedTask) -> Submission:
         counts = prepared.preparation.get("line_counts")
         if counts is None:
