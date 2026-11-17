@@ -1,48 +1,70 @@
-# Tool-policy conditions for the first demo (E1 fixture).
-# One file, many named conditions; a run selects one (D1). baseline_plus_index
-# extends baseline and states only the delta (D2), so the two differ *only* in
-# the declared addition (R2).
+# Tool-policy conditions. One file, many named conditions; a run selects one (D1).
+# Conditions use `extends` (D2) so each states only its delta (R2).
+#
+# The tool *vocabulary* is benchmark-agnostic: grep/read/edit/run/submit/network and
+# the index_query block mean the same thing regardless of which benchmark runs. Those
+# shared definitions are declared once as YAML anchors (&name) below and referenced
+# (*name) in conditions. What differs per benchmark is only *which* tools form its
+# required floor (SWE-Explore localization: grep/read/submit; SWE-bench repair adds
+# edit/run) -- that difference is load-bearing for R4 validation, so baselines stay
+# explicit rather than merged.
 version: 1
 
+# --- shared tool vocabulary (anchors; not conditions themselves) ---
+_defs:
+  directives:
+    allow: &allow { directive: allow }
+    deny:  &deny  { directive: deny }
+  # The index_query tool, defined once. neutral vs encouraged differ only by the
+  # recorded description_style, so each is its own anchor over a shared payload.
+  index_neutral: &index_neutral
+    directive: add
+    payload: { kind: bm25, index_ref: null, stale: false }   # D4: opaque, swappable
+    limits:  { top_k: 10, max_snippet_bytes: 2048, timeout_seconds: 30 }
+    result_shape: pointers_plus_snippet                      # E0-S5
+    description_style: neutral
+  index_encouraged: &index_encouraged
+    directive: add
+    payload: { kind: bm25, index_ref: null, stale: false }
+    limits:  { top_k: 10, max_snippet_bytes: 2048, timeout_seconds: 30 }
+    result_shape: pointers_plus_snippet
+    description_style: encouraged
+
 conditions:
+  # --- SWE-Explore localization floor: grep + read + submit ---
   baseline:
     description: "Task-scoped search: grep + read + submit. Network off."
     tools:
-      grep:    { directive: allow }
-      read:    { directive: allow }
-      submit:  { directive: allow }
-      network: { directive: deny }           # enforced via container netns=none (D5)
+      grep:    *allow
+      read:    *allow
+      submit:  *allow
+      network: *deny        # enforced via container netns=none (D5)
 
   baseline_plus_index:
     extends: baseline
-    description: "Baseline plus an index_query retrieval tool (payload opaque to policy)."
+    description: "Baseline plus a neutral index_query retrieval tool."
     tools:
-      index_query:
-        directive: add
-        payload:
-          kind: bm25                          # D4: opaque; BM25 now, swappable later
-          index_ref: null                     # resolved + hashed at prepare time (E2)
-          stale: false
-        limits:
-          top_k: 10
-          max_snippet_bytes: 2048
-          timeout_seconds: 30
-        result_shape: pointers_plus_snippet   # E0-S5
-        description_style: neutral             # tool offered, no preference expressed
+      index_query: *index_neutral
 
   baseline_plus_index_encouraged:
     extends: baseline_plus_index
-    description: "Same index tool, but the prompt encourages trying it first (recorded nudge)."
+    description: "Same index tool, prompt encourages trying it first (recorded nudge)."
     tools:
-      index_query:
-        directive: add
-        payload:
-          kind: bm25
-          index_ref: null
-          stale: false
-        limits:
-          top_k: 10
-          max_snippet_bytes: 2048
-          timeout_seconds: 30
-        result_shape: pointers_plus_snippet
-        description_style: encouraged          # the only delta from baseline_plus_index
+      index_query: *index_encouraged
+
+  # --- SWE-bench repair floor: adds edit + run (agent edits + runs tests) ---
+  swebench_baseline:
+    description: "SWE-bench repair floor: grep + read + edit + run + submit."
+    tools:
+      grep:    *allow
+      read:    *allow
+      edit:    *allow       # soft 'allow': agent exercises it via bash in a writable container
+      run:     *allow
+      submit:  *allow
+      network: *deny
+
+  swebench_plus_index:
+    extends: swebench_baseline
+    description: "SWE-bench repair plus index_query (find-only, pre-edit; E5-A4)."
+    tools:
+      index_query: *index_encouraged
