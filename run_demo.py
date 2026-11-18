@@ -23,6 +23,7 @@ Examples:
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 from benchkit import Coordinator
@@ -162,7 +163,9 @@ def cmd_demo(args):
     sweep_root = (
         Path(args.runs_root).expanduser() if args.runs_root else (ROOT / "runs")
     )
-    return _emit(dirs, sweep_root / "sweep")
+    return _emit(
+        dirs, sweep_root / "sweep", sweep_id=args.sweep_id, append=not args.overwrite
+    )
 
 
 def _score_run(run_dir, args, prepared=None):
@@ -195,25 +198,40 @@ def cmd_score(args):
 
 
 def cmd_join(args):
-    return _emit([Path(d) for d in args.run_dirs], Path(args.out))
+    return _emit(
+        [Path(d) for d in args.run_dirs],
+        Path(args.out),
+        sweep_id=args.sweep_id,
+        append=not args.overwrite,
+    )
 
 
-def _emit(run_dirs, out_prefix):
-    from metrics import join_runs, to_csv, to_prometheus
+def _emit(run_dirs, out_prefix, sweep_id=None, append=True):
+    from metrics import join_runs, to_prometheus, write_csv
 
-    rows = join_runs(run_dirs)
     out_prefix = Path(out_prefix)
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
+    # sweep_id groups the rows of this comparison; default to the output stem +
+    # a timestamp so repeated sweeps into the same pool stay distinguishable.
+    if sweep_id is None:
+        sweep_id = (
+            out_prefix.name + "-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        )
+
+    rows = join_runs(run_dirs, sweep_id=sweep_id)
+
+    # Pool CSV accumulates one row per run (append); .prom reflects this sweep only.
+    csv_path = out_prefix.with_suffix(".csv")
+    write_csv(rows, csv_path, append=append)
     (out_prefix.with_suffix(".prom")).write_text(to_prometheus(rows))
-    (out_prefix.with_suffix(".csv")).write_text(to_csv(rows))
-    print(
-        "Wrote:", out_prefix.with_suffix(".prom"), "and", out_prefix.with_suffix(".csv")
-    )
+    print(f"Sweep {sweep_id}")
+    print(f"  pool CSV ({'appended' if append else 'written'}):", csv_path)
+    print("  prom (this sweep):", out_prefix.with_suffix(".prom"))
     for r in rows:
         cond = r.get("condition") or "(unlabeled)"
         print(
-            f"  {cond:24} score={r.get('native_score')} "
-            f"lines_read={r.get('lines_read_total')} "
+            f"  [{r.get('repetition')}] {cond:30} run={r.get('run_key')} "
+            f"score={r.get('native_score')} lines_read={r.get('lines_read_total')} "
             f"failure={r.get('failure_category')}"
         )
     return 0
@@ -272,6 +290,16 @@ def main():
         default=None,
         help="condition names (default: per-benchmark baseline + index)",
     )
+    d.add_argument(
+        "--sweep-id",
+        default=None,
+        help="grouping label for this comparison's rows (default: auto)",
+    )
+    d.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="overwrite the pool CSV instead of appending",
+    )
     common(d)
     d.set_defaults(func=cmd_demo)
 
@@ -280,6 +308,16 @@ def main():
     )
     j.add_argument("run_dirs", nargs="+")
     j.add_argument("--out", default="runs/sweep")
+    j.add_argument(
+        "--sweep-id",
+        default=None,
+        help="grouping label for this comparison's rows (default: auto)",
+    )
+    j.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="overwrite the pool CSV instead of appending",
+    )
     j.set_defaults(func=cmd_join)
 
     s = sub.add_parser(

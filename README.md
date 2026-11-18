@@ -1,76 +1,105 @@
-# University model benchmark starter
+# Configurable tool-policy benchmarking for coding agents
 
-Prepared 2026-11-02 for BME API + Windows/WSL2 + Docker.
+A research framework for measuring how an agent's **available tool set** (especially
+repository search and retrieval) affects its task performance and resource cost,
+under otherwise controlled conditions. It runs existing coding benchmarks through a
+pluggable adapter, exposes tools to the agent by a declared YAML policy, and records
+outcome and per-channel cost for comparison.
 
-This is a starter implementation, not a completed benchmark campaign. The code
-uses mini-SWE-agent's model, agent loop, SWE-bench environment preparation and
-serialization. It adds task selection, process isolation, budgets, run records,
-prediction export and measurement summaries. No university API key is included.
+Prepared for BME API + Windows/WSL2 + Docker. No university API key is included.
+This is active research tooling, not a finished product: interfaces are stabilizing
+but still evolve, and "verified live" vs "offline only" is called out explicitly.
 
-## First scope
+## What it is now
 
-1. Validate API action compatibility for each model.
-2. Run one SWE-bench Lite task end to end.
-3. Evaluate the generated patch with the official harness.
-4. Repeat with the other model, then a fixed small task list.
-5. Add SWE-Explore using the same model and measurement conventions.
+The framework wraps a pinned mini-SWE-agent (2.4.6) and a locked-down container.
+A run is: **resolve a tool policy → prepare a task → run the agent → parse its
+submission → grade with the benchmark's official evaluator → record cost × outcome.**
 
-See PLAN.md for research design, exploration integration and later benchmarks.
-SWE-Explore is a documented integration stage here, not a completed adapter.
+The only thing that changes between the arms of a comparison is the declared tool
+policy (e.g. baseline search vs baseline + an index tool). Everything else — model,
+budgets, image, prompt scaffold — is held fixed and recorded.
 
-## Architecture
+Two benchmarks are wired in and verified end to end through the common framework:
 
-| Component | Location | Responsibility |
-|---|---|---|
-| University inference server | University | Generate model responses through `/v1` |
-| This runner + mini-SWE-agent | WSL | Manage history, API calls and tools |
-| Task container | Local Docker | Repository, edits, dependencies and agent tests |
-| Official evaluator | Separate WSL virtual environment + Docker | Grade patch |
-| Run outputs | Local `runs/` directory | Audit, compare and analyze |
+| Benchmark | Task | Submission | Grading |
+|---|---|---|---|
+| SWE-Explore | locate relevant code for an issue | ranked `path:start-end` regions | upstream region scorer |
+| SWE-bench Lite | repair a real bug | a patch (`git diff`) | official hidden-test harness (resolved/unresolved) |
 
-The agent gets only the issue prompt and tool outputs, not reference patches or
-grading labels. Task containers have no host workspace mounts, API key forwarding,
-or Docker socket mounts in this configuration. Container networking is not
-disabled: this is not a strict offline evaluation policy. If researching restricted
-retrieval, enforce the same network and tool policy in every experimental arm.
+Adding a benchmark is one adapter + YAML conditions + one registry entry; the policy,
+index-tool, and metrics layers are untouched (this reusability was proven by wiring
+SWE-bench in after SWE-Explore).
 
-## 1. Install in WSL
+## Repository layout
 
-Keep your existing experiments unchanged. Extract this folder into a new directory,
-preferably `~/uni/research-bench-starter` on WSL's Linux filesystem.
-Python 3.12 is a convenient common version for the planned Explore integration.
-Docker Desktop must be running with WSL integration enabled.
+```
+run_demo.py        Example driver: pick a benchmark + condition, run/score/join.
+conditions/        config.yaml — named tool-policy conditions (YAML anchors share
+                   the common tool vocabulary; per-benchmark baselines differ only
+                   in their required tool floor).
+benchkit/          Coordinator, BenchmarkAdapter contract, the two adapters,
+                   model_config (model/budget config + token accounting),
+                   Option-B index serialisation + in-container index_query CLI.
+toolpolicy/        Declared YAML policy -> resolved, inspectable, hashed effective
+                   policy (per-tool enforcement status: enforced/best-effort).
+indextool/         Frozen index_query tool contract + a swappable payload (BM25 now;
+                   RAG/LSP later) + chunking.
+metrics/           Per-channel read attribution (search/read/index/other/
+                   unattributed), failure buckets, and a join that emits
+                   Prometheus-text + CSV.
+oracle/            Legacy/reference scripts from the project's sandbox origin
+                   (bench.py, explore.py, repobench_api.py). Not maintained, not
+                   imported by the framework; kept as worked references.
+docs/              Design notes and the working backlog.
+runs/              Per-run outputs (gitignored).
+```
+
+## Isolation and label hygiene
+
+- The agent sees only the issue and tool outputs — never reference patches, gold
+  regions, hidden tests or FAIL_TO_PASS. Gold data is written to host-only
+  `*.grading.*` files, outside any container mount.
+- Containers: `--network=none --cap-drop=ALL --security-opt=no-new-privileges`;
+  SWE-Explore mounts the repo read-only, SWE-bench repair uses the task's installed
+  image with a writable `/testbed`. No API key forwarding, no Docker socket mount.
+- Tool restrictions are **best-effort / record-only** in the first cut: a policy
+  records which tools are available and whether a restriction is enforced; it does
+  not claim a shell agent cannot bypass a missing binary. `network: deny` is the one
+  genuinely enforced restriction (container netns).
+
+## 1. Install (WSL)
+
+Keep the repo on the WSL Linux filesystem (not `/mnt/c`) if you can; `/mnt/c` write
+errors under heavy per-step writes are a known nuisance (see run outputs below).
+Docker/Podman must be running.
 
 ```bash
-bash setup.sh
+make setup          # create .venv-agent and vendored evaluator sources (scripts/setup.sh)
+make requirements   # install pinned agent deps + the fuzzywuzzy scorer dep
 source .venv-agent/bin/activate
 docker info
 ```
 
-The agent is pinned to upstream commit
-`04d809ceab9df28f9adaed044884180159172930`, reporting version 2.4.6. It is
-deliberately a separate environment from older mini-SWE-agent installations.
-Transitive dependencies are resolved at install time; preserve `installed-agent.txt`
-and each run's `packages.txt` and use that dependency snapshot across experiments.
+The agent is pinned to mini-SWE-agent 2.4.6. Preserve `installed-agent.txt` and each
+run's `packages.txt` as the dependency snapshot across experiments.
 
 ## 2. Development commands
 
-The Makefile provides common repository workflows after creating the agent environment:
-
 ```bash
-make setup           # create environments and vendored evaluator sources
-make requirements    # install the pinned agent dependencies
-make build           # compile Python sources
-make test            # run the offline unittest suite
-make format-check    # verify Ruff formatting without changing files
-make format          # apply Ruff formatting
-make lint            # run Ruff lint checks
-make check           # run formatting, lint, and tests
+make build    # compile all sources (benchkit indextool metrics oracle toolpolicy tests)
+make test     # offline unittest suite (mocked APIs, synthetic fixtures, no Docker)
+make lint     # ruff lint
+make ruff     # ruff format --check (no changes)
+make format   # apply ruff formatting
+make check    # ruff format-check + lint + test
+make help     # list targets
 ```
 
-Use `make format-check` in CI or before committing; use `make format` to apply changes locally.
+The offline suite needs no API, Docker, or live grading. A few tests self-skip
+without the optional evaluator sources (`explore-evaluator-src`, `repobench-src`).
 
-## 3. Set the API key without putting it into command history
+## 3. Set the API key (kept out of shell history)
 
 ```bash
 read -rsp 'BME API key: ' OPENAI_API_KEY
@@ -79,137 +108,74 @@ export OPENAI_API_KEY
 export BME_API_BASE='https://xrlab-ie318-3.tmit.bme.hu/v1'
 ```
 
-Do not put keys in model configuration, task prompts or uploaded logs.
+Never put the key in config, prompts, or logs.
 
-## 4. Test action compatibility
+## 4. Run a condition
 
-```bash
-python bench.py probe --model small --interface tools
-python bench.py probe --model large --interface tools
-```
-
-These calls ask the model for one harmless action, parse it through mini's actual
-model interface and verify it. They **do not execute** the returned shell command.
-If structured calls fail, independently test the text-action interface:
+`run_demo.py` is an example driver, not the framework itself (the framework is the
+`benchkit`/`toolpolicy`/`indextool`/`metrics` packages). The benchmark is a parameter.
 
 ```bash
-python bench.py probe --model small --interface text
+# SWE-Explore localization (default benchmark)
+python run_demo.py run  --benchmark swe-explore --condition baseline
+python run_demo.py run  --benchmark swe-explore --condition baseline_plus_index_encouraged
+
+# SWE-bench repair
+python run_demo.py run  --benchmark swe-bench --condition swebench_baseline
 ```
 
-For a controlled model comparison, use the same passing interface for both models.
-If content remains null and actions appear only in reasoning_content, stop and
-check the server's chat template/reasoning/tool parser configuration. This starter
-does not promote reasoning into executable output. A successful prose response
-alone does not establish action compatibility.
+Defaults: `large` model, 30 steps, 2048 output tokens/call, temperature 0, 3600 s
+wall budget. On `/mnt/c`, add `--runs-root ~/bench-runs` to write run outputs to the
+Linux filesystem and avoid intermittent write errors.
 
-## 5. Prepare and run the known smoke task
+Each run directory contains `manifest.json` (model, budgets, resolved policy,
+image, index provenance, hashes), `trajectory.traj.json`, `submission.txt` +
+`submission.parsed.json`, and `metrics.json` (tokens, tool actions, per-channel
+read attribution, failure category, wall time).
 
-Plan only (downloads/selects dataset, writes metadata, does not run an agent):
+## 5. Score and join
+
+Grading is a separate step (no model calls). SWE-Explore uses its upstream region
+scorer; SWE-bench shells out to the official harness in a dedicated venv.
 
 ```bash
-python bench.py run --model small --interface tools
+python run_demo.py score <run-dir> --benchmark swe-bench
+python run_demo.py join  <run-a> <run-b> --out runs/sweep
 ```
 
-Execute (also reruns the compatibility check):
+`join` emits `sweep.prom` (Prometheus text exposition) and `sweep.csv`, joining
+native outcome with per-condition cost. The metrics are named/labelled for a
+Prometheus/Grafana stack; actual dashboards are a later scope.
+
+`demo` runs several conditions, scores each, and joins in one command:
 
 ```bash
-python bench.py run --model small --interface tools --execute
+python run_demo.py demo --benchmark swe-bench \
+  --conditions swebench_baseline swebench_plus_index --runs-root ~/bench-runs
 ```
 
-Defaults: `astropy__astropy-12907`, 30 model steps, 2048 output tokens per
-call, 120 seconds per shell command, 3600 seconds total worker timeout including
-image startup. This is a debugging budget, not an optimized performance setting.
-At the professor's approximate 20 generated tokens/second, 2048 generated tokens
-alone take about 102 seconds per call. Thirty full outputs could take roughly
-51 minutes before adding prompt processing, tools and setup.
+## 6. The official evaluators
 
-Use the printed run directory for the following commands. It contains:
+SWE-bench grading uses the official harness pinned to tag `v2.1.7` in a separate
+venv (`.venv-eval`); the harness is a property of SWE-bench, independent of the run
+environment. SWE-Explore uses the pinned upstream region scorer in
+`explore-evaluator-src`. An evaluator exiting 0 is **not** evidence a task resolved —
+read the official report; the framework records `resolved: null` when no report is
+produced rather than inventing a pass.
 
-- `manifest.json`: model, interface, budgets, dataset fingerprint, package versions.
-- `selected-tasks.grading.json`: host-only snapshot of full task records.
-- `packages.txt`: dependency snapshot.
-- Per task: sanitized `task.json`, trajectory, patch, prediction, metrics,
-  process status and log.
-- `predictions.json`: official-evaluator input after execution.
+## Tool policy and the index tool
 
-The full task snapshot is never mounted into the agent container or sent as a
-prompt. A new timestamp/UUID directory is created for every run.
-
-For strict reproducibility, replace the moving dataset default with a Hugging Face
-dataset commit: `--dataset-revision COMMIT_SHA`. The exact selected records are
-saved and hashed even when `main` is used. Pin Docker images by digest before a
-reported campaign; this starter uses mini's upstream task image mapping/tags.
-
-## 6. Evaluate separately
-
-Your saved Kiro run notes document using SWE-bench tag `v2.1.7` after a schema
-problem with a newer harness. Reuse that known evaluator first if it is still
-available. Otherwise create a dedicated one:
-
-```bash
-git clone --branch v2.1.7 --depth 1 https://github.com/SWE-bench/SWE-bench.git evaluator-src
-python3 -m venv .venv-eval
-.venv-eval/bin/python -m pip install -e ./evaluator-src
-.venv-eval/bin/python -m pip freeze > installed-evaluator.txt
-```
-
-Then, while the agent environment is active:
-
-```bash
-python bench.py evaluate runs/YOUR_RUN_DIRECTORY \
-  --evaluator-python "$PWD/.venv-eval/bin/python"
-python bench.py summarize runs/YOUR_RUN_DIRECTORY
-```
-
-The harness runs in the selected run directory. Each evaluation receives a fresh
-run ID to avoid stale cached grading. Preserve its report, evaluation log,
-evaluator Git revision, dependency snapshot and image digests.
-An evaluator process exiting successfully is **not** evidence the issue resolved;
-read the official resolved/unresolved result. CSV summaries do not yet merge
-official grading, which remains authoritative in the harness report.
-
-## 7. Expand cautiously
-
-```bash
-python bench.py run --model large --interface tools --execute
-python bench.py run --model small --interface tools \
-  --instances astropy__astropy-12907,ANOTHER_VALID_INSTANCE_ID --execute
-```
-
-Replace the second placeholder with a real instance ID. Use the same instances,
-budgets and interface for both models. Run serially initially; do not assume the
-shared endpoint can handle parallel workers or an unrestricted experiment load.
-
-## Measurement limitations
-
-- Recorded token totals include reasoning when the provider includes it in
-  completion_tokens. They sum usage across responses; context is a per-call limit.
-- Missing usage is null/flagged, not zero. Failed transport attempts or provider
-  retries may not appear as completed responses. Counts are not server billing.
-- Monetary cost is unknown, even if mini's internal missing-price fallback says 0.
-- The largest recorded input is not a token-budget enforcement mechanism. Server
-  context errors remain possible. Per-call output, step and wall limits are enforced.
-- Timed-out workers may have partial trajectories. The agent saves after each step;
-  inspect the last saved state. A container killed before cleanup may remain until
-  its configured lifetime ends. Inspect `docker ps` before another large run.
-- Tool-action counts are not line-level exploration metrics. Arbitrary shell reads
-  require instrumentation or a defined exploration output contract (PLAN.md).
-- One successful task validates plumbing; it is not a benchmark success-rate claim.
-
-## Validation included
-
-`python -m unittest discover -s tests -v` checks token aggregation (including format
-failures and missing data), task selection, CSV export and evaluator invocation.
-These offline tests do not substitute for API, Docker-image or live grading checks.
+Conditions are declared in `conditions/config.yaml`, additively: a baseline names the
+task-essential tools; `*_plus_index` conditions add the `index_query` retrieval tool.
+The index is a swappable payload behind a frozen tool contract (BM25 now; built on
+the host at prepare time, serialised, and read inside the locked container by a
+pure-stdlib CLI — no network, no host callback). A recorded `description_style`
+(neutral vs encouraged) controls how assertively the prompt offers the index, so
+prompt-nudge strength is part of the recorded intervention, not hidden drift.
 
 ## Sources
 
 - https://mini-swe-agent.com/latest/usage/swebench/
-- https://mini-swe-agent.com/latest/models/local_models/
-- https://mini-swe-agent.com/latest/advanced/environments/
 - https://github.com/SWE-agent/mini-swe-agent/tree/04d809ceab9df28f9adaed044884180159172930
 - https://github.com/Qiushao-E/SWE-Explore-Bench
 - https://www.swebench.com/SWE-bench/guides/evaluation/
-
-Upstream source was inspected when creating this starter. No authenticated
-university run or local Docker evaluation has been performed from this workspace.

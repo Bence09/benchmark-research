@@ -522,6 +522,22 @@ Not started until E1–E4 land. Listed so scope does not silently drift back.
 - **E5-D** Repository-size knob (PIPELINE.md generator, stage G).
 - **E5-E** Churn / stale-index experiments and staleness measurement.
 - **E5-F** Multi-task sets with repetitions and uncertainty for comparative claims.
+  - **Results pool (not last-run-wins).** Today `run_demo` writes a fixed
+    `sweep.prom`/`sweep.csv` that each `demo`/`join` **overwrites** — fine for a
+    one-shot view, wrong for repetitions. The per-run dirs already preserve raw
+    data (each `runs/<...>/` has its own metrics/scores), so nothing is lost; only
+    the joined view clobbers. For the repetition study the sweep should **accumulate
+    one row per run** instead of overwriting.
+  - **Keys.** Each row carries a **unique run key** (the run-dir label — timestamp +
+    uuid8 — identifying one run-package) plus a **grouping key** so rows that belong
+    to the same comparison are recognisable and human-readable (e.g. a `sweep_id`/
+    `experiment` label + `benchmark` + `condition` + `repetition` index). This makes
+    "which runs form this comparison, and which repetitions of which condition" clear
+    at a glance and groupable for uncertainty stats.
+  - Motivation (observed 2026-11-18): repeated runs of one fixed SWE-Explore task
+    varied run-to-run (f1 0.087/0.121/0.087, step counts and wall time wobbling), so
+    single-run comparisons are noise-dominated — a pool with repetitions + reported
+    spread is required before any comparative claim.
 
 ---
 

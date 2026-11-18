@@ -12,7 +12,7 @@ null for unknown) so a Prometheus/Grafana-style stack can consume them later.
 """
 
 from .failures import FailureCategory, classify_failure
-from .join import join_runs, to_csv, to_prometheus
+from .join import join_runs, to_csv, to_prometheus, write_csv
 from .read_metrics import Channel, classify_command, read_metrics
 
 __all__ = [
@@ -24,4 +24,5 @@ __all__ = [
     "read_metrics",
     "to_csv",
     "to_prometheus",
+    "write_csv",
 ]
