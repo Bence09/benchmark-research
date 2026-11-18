@@ -1,6 +1,6 @@
-"""Failure classification (E4-S1, tool_policy §6).
+"""Failure classification.
 
-Separates the four categories so summaries never conflate "crashed" with
+Separates the four categories so summaries never misclassify "crashed" with
 "answered badly":
   - infra:           container/transport/setup failures outside our control
   - policy_setup:    missing required capability, index build failure, bad config
@@ -27,11 +27,12 @@ _INFRA = {"SetupError", "ConnectionError", "Timeout", "APIError", "DockerError"}
 _LIMIT = {"LimitsExceeded", "length", "StepLimitExceeded", "ContextWindowExceeded"}
 
 
-def classify_failure(exit_status, *, has_valid_submission=False,
-                     resolved=None, policy_error=False) -> FailureCategory:
+def classify_failure(
+    exit_status, *, has_valid_submission=False, resolved=None, policy_error=False
+) -> FailureCategory:
     """Map a run's outcome to a failure category.
 
-    `resolved`/`has_valid_submission` come from the benchmark evaluator; a valid
+    `resolved`/`has_valid_submission` come from the benchmark evaluator, a valid
     but low-scoring submission is VALID_BUT_WRONG, not a failure of the harness.
     """
     if policy_error:
@@ -48,8 +49,10 @@ def classify_failure(exit_status, *, has_valid_submission=False,
             return FailureCategory.OK
         if resolved is False:
             return FailureCategory.VALID_BUT_WRONG
-        # No grading verdict yet: a valid submission is OK at the run level.
-        return FailureCategory.OK if has_valid_submission else FailureCategory.OUTPUT_LIMIT
+        # No grading decision implemented yet: a valid submission is OK at the run level.
+        return (
+            FailureCategory.OK if has_valid_submission else FailureCategory.OUTPUT_LIMIT
+        )
 
     # Unknown / empty status with no submission: treat as infra (safest non-result).
     return FailureCategory.INFRA

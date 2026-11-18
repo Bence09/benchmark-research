@@ -1,6 +1,6 @@
-"""Frozen contract types for the index tool (E0-S3 / E2).
+"""Frozen contract types for the index tool.
 
-The ToolBoundary depends only on these; concrete payloads (BM25, RAG, ...) must
+The ToolBoundary depends only on these, concrete payloads (BM25, RAG, ...) must
 satisfy IndexPayload without the boundary knowing which one it is.
 """
 
@@ -24,7 +24,7 @@ class Region:
 
 @dataclass
 class BuildInfo:
-    """Provenance recorded when an index is built (R9). Serialized to index.json."""
+    """Provenance recorded when an index is built. Serialized to index.json."""
 
     kind: str
     build_seconds: float
@@ -48,11 +48,11 @@ class BuildInfo:
 
 @dataclass
 class ToolCallRecord:
-    """One structured log record per tool call (R7, E4 input).
+    """One structured log record per tool call.
 
     Distinguishes available / called / returned / errored / denied, and tags the
     delivered bytes with channel='index_query' so reads via the index are
-    separable from explicit `read` reads (E0 persistence requirement).
+    separable from explicit `read` reads.
     """
 
     tool: str

@@ -1,13 +1,8 @@
-"""Per-channel read attribution from a trajectory (E4-S1).
+"""Per-channel read attribution from a trajectory.
 
 Pairs each assistant action with its following `tool` observation and attributes
 the observation's delivered bytes/lines to a channel chosen by the first program
-in the command's pipeline. Commands with an unknown leader go to `unattributed`
-and are never silently folded into a channel or zeroed (tool_policy §10).
-
-Trajectory shape (observed from real runs):
-  assistant msg: extra.actions = [{command, tool_call_id}, ...]
-  each action's output = the next `tool` message's content, in order.
+in the command's pipeline. Commands with an unknown leader go to `unattributed`.
 """
 
 from __future__ import annotations
@@ -17,11 +12,13 @@ from enum import Enum
 
 
 class Channel(str, Enum):
-    SEARCH = "search"       # grep, rg, find
-    READ = "read"           # sed -n, nl, cat, head, tail, less
-    INDEX = "index"         # index_query (the added tool)
-    OTHER = "other"         # known-but-not-a-read command
-    UNATTRIBUTED = "unattributed"  # unknown leader; volume not attributed to a read channel
+    SEARCH = "search"  # grep, rg, find
+    READ = "read"  # sed -n, nl, cat, head, tail, less
+    INDEX = "index"  # index_query (the added tool)
+    OTHER = "other"  # known-but-not-a-read command
+    UNATTRIBUTED = (
+        "unattributed"  # unknown leader; volume not attributed to a read channel
+    )
 
 
 _SEARCH = {"grep", "egrep", "fgrep", "rg", "ripgrep", "find", "ag"}
@@ -63,8 +60,7 @@ def _first_program(command: str) -> str | None:
             continue  # VAR=value prefix
         # strip a path, keep the basename (e.g. /opt/index_query.py -> index_query.py)
         base = tok.rsplit("/", 1)[-1]
-        if base.endswith(".py"):
-            base = base[:-3]
+        base = base.removesuffix(".py")
         return base
     return None
 
@@ -85,11 +81,7 @@ def read_metrics(trajectory: dict) -> dict:
     messages = trajectory.get("messages", [])
     channels = {c.value: {"calls": 0, "bytes": 0, "lines": 0} for c in Channel}
 
-    # Flatten: ordered list of (command) actions, and ordered list of tool observations.
-    pending_actions: list[str] = []
-    obs_iter_index = 0
-    # We walk messages; when we hit an assistant with actions we queue the commands,
-    # and consume the subsequent `tool` messages as their observations in order.
+    # Consume subsequent tool messages as observations for each assistant action.
     i = 0
     n = len(messages)
     while i < n:
@@ -105,7 +97,10 @@ def read_metrics(trajectory: dict) -> dict:
                 if messages[j].get("role") == "tool":
                     obs.append(messages[j].get("content"))
                     j += 1
-                elif messages[j].get("role") == "tool" or messages[j].get("role") == "user":
+                elif (
+                    messages[j].get("role") == "tool"
+                    or messages[j].get("role") == "user"
+                ):
                     j += 1
                 else:
                     break
@@ -130,7 +125,7 @@ def read_metrics(trajectory: dict) -> dict:
         "channels": channels,
         "lines_read_total": lines_total,
         "bytes_read_total": bytes_total,
-        # Honesty: calls whose read volume we could not attribute to a read channel.
+        # calls whose read volume we could not attribute to a read channel.
         "unattributed_calls": unattributed_calls,
         "unattributed_bytes": channels[Channel.UNATTRIBUTED.value]["bytes"],
     }

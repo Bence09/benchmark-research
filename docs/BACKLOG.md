@@ -433,6 +433,53 @@ via `adapter.parse_submission`, grade via `adapter.evaluate`. Needs Docker +
 Join outcome × cost across conditions; produce the tutorial artifact. Pulls
 PIPELINE.md's read instrumentation forward.
 
+### E4 — Built and verified (2026-11-16)
+
+Package `metrics/`. Pure/offline post-hoc over artifacts mini already writes (never
+forks mini). **Scope shift agreed:** result handling targets a Prometheus/Grafana
+style — define metrics cleanly, emit them consumable; plotting (MATLAB/matplotlib)
+is explicitly *not* the main path. Grafana dashboards = separate later scope.
+
+- `read_metrics.py` — per-channel read attribution. Classifies each command by the
+  **first program in its pipeline** (`grep/rg/find`→search, `sed/nl/cat/head/tail`
+  →read, `index_query`→index, known-non-read→other, **unknown leader→unattributed**).
+  Attributes the paired `tool` observation's delivered bytes/lines to that channel.
+  Unattributed volume is reported separately, never folded into a read channel or
+  zeroed (§10). This is the per-channel split the E0 snippet-channel decision was
+  built for: index reads are separable from grep/sed reads.
+- `failures.py` — four §6 buckets: `infra` / `policy_setup` / `output_limit` /
+  `valid_but_wrong` (+`ok`). A valid-but-low-scoring submission is a *result*, not
+  a harness failure.
+- `join.py` — `join_runs(run_dirs)` → flat labeled rows (outcome kept distinct from
+  cost; index build cost reported separately). Emitters: `to_prometheus` (text
+  exposition, **Prometheus naming**: `bench_*`, `_total`/`_bytes`/`_seconds`,
+  labels `{benchmark,condition,instance,channel}`, **nulls omitted — absent ≠ zero**)
+  and `to_csv` (channel-labeled columns). Missing measurements stay null.
+
+**Decisions settled here:** first-program channel classification, unknown→
+unattributed; Prometheus-convention metric naming from day one; plotting/Grafana
+parked as separate scope once the core system runs.
+
+**Verification (`tests/test_metrics.py`, 18 tests):**
+- Classification: search/read/index leaders, first-program-in-pipeline wins
+  (`grep … | head`→search, `nl … | sed`→read), unknown leader→unattributed,
+  env-prefix skipped.
+- Attribution: per-channel line counts on synthetic trajectories; unattributed not
+  counted as a read; empty trajectory → 0.
+- **Real trajectory**: the oracle explore run attributes to 4 search calls (51
+  lines) + 5 read calls (218 lines) = **269 lines read, 0 unattributed** — every
+  real command classified cleanly, validating the first-program rule on real agent
+  behavior. (That run: 269 lines read → 0.09 f1, the baseline cost×outcome point.)
+- Failure buckets; join reports index build cost separately (null for baseline);
+  Prometheus omits null metrics (no phantom zero index cost on baseline); CSV has
+  channel columns.
+- Full discovery: **87 tests OK (5 oracle skips)**, no regressions.
+
+**Still the live step (E4-S2 real numbers):** the actual baseline vs +index runs
+need Docker + API (same as E3 `execute()`). The join/emitters are verified offline
+on synthetic + real artifacts; they will consume the live run dirs unchanged.
+
+
 ### E4-S1 — Cost/outcome metrics (incl. line-level reads)
 **Subtasks**
 - Collect per run: native outcome, input/output/reasoning tokens, model-call
@@ -467,6 +514,7 @@ PIPELINE.md's read instrumentation forward.
 Not started until E1–E4 land. Listed so scope does not silently drift back.
 
 - **E5-A** SWE-bench adapter — second conforming adapter; proves reusability (R12).
+  **Promoted to an active epic below (2026-11-16).**
 - **E5-B** Strict enforcement condition — real tool removal (derived image / `offline_only`),
   with enforcement status honestly recorded (R3); note arbitrary shell can bypass
   a removed binary (§8).
@@ -474,6 +522,70 @@ Not started until E1–E4 land. Listed so scope does not silently drift back.
 - **E5-D** Repository-size knob (PIPELINE.md generator, stage G).
 - **E5-E** Churn / stale-index experiments and staleness measurement.
 - **E5-F** Multi-task sets with repetitions and uncertainty for comparative claims.
+
+---
+
+## Epic 5-A — SWE-bench repair adapter (second conforming adapter)
+
+Wire real SWE-bench repair (patch + hidden-test grading) into the framework as a
+second `BenchmarkAdapter`. The point is to prove the core (policy layer, index tool,
+coordinator, metrics) carries a structurally different benchmark without change
+(R12) — not to bend SWE-bench into localization.
+
+**Settled scope (2026-11-16):**
+- Full repair: submission is a patch; grading runs the official SWE-bench hidden
+  tests (resolved / unresolved). Not a localization mode.
+- Reuse the existing official evaluator as-is: the oracle's `.venv-eval` + harness
+  tag `v2.1.7` (proven on `astropy__astropy-12907`). The harness is a property of
+  SWE-bench itself, independent of our run environment; the adapter's `evaluate()`
+  shells out to it (mirrors oracle `bench.evaluate()`), treating it as the
+  designated grader (R8). Verify it still runs before assuming compatibility.
+- Demo task: reuse `astropy__astropy-12907` (proven image + grading; an existing
+  resolved oracle run dir confirms the baseline). Goal is a real end-to-end repair
+  run driven through *our* framework, baseline vs +index.
+
+**Key differences from the SWE-Explore adapter (why this is real work, not a swap):**
+- Container is the task's *installed* image, and the repo is *writable* (the agent
+  edits + the harness runs tests) — the SWE-Explore `--read-only` lockdown
+  assumption changes. Crib from oracle `bench.py` (image mapping, patch extraction).
+- `evaluate()` runs Docker-based test execution, not a pure-Python scorer.
+- Index staleness: the Option-B index is built at prepare time and read-only; a
+  repair agent edits files, so the index can go stale mid-run. First cut: index is
+  for *finding* the bug (pre-edit); record the assumption, defer churn (E5-E).
+
+### E5-A1 — Adapter: prepare + required_capabilities + container_spec
+Crib the task-image + installed-repo setup from oracle `bench.py`; repo is writable.
+**Acceptance**
+- `required_capabilities()` names the repair floor (search, read, edit, run-tests,
+  submit-patch); config validation flags a policy missing any before running (R4).
+- `container_spec` uses the task image; lockdown reflects a writable repair repo,
+  honestly different from SWE-Explore's read-only spec (recorded).
+- No change required to `toolpolicy`, `indextool`, `metrics`, `coordinator`.
+
+### E5-A2 — parse_submission (patch) + evaluate (official harness)
+**Acceptance**
+- `parse_submission` returns a `Submission(kind="patch", ...)`; empty/invalid patch
+  is a recorded failure, not a crash.
+- `evaluate()` writes `predictions.json`, invokes the reused `.venv-eval`/v2.1.7
+  harness with a fresh run id, and returns the official resolved/unresolved result
+  (R8); harness success != resolved (read the report, not the exit code).
+
+### E5-A3 — Metrics + failure mapping for repair
+**Acceptance**
+- `read_metrics` works unchanged (trajectory-based); verified on a repair trajectory.
+- Repair outcomes map to the E4 buckets: resolved→ok, valid-patch-but-unresolved→
+  valid_but_wrong, empty/invalid patch→output_limit/infra as appropriate.
+
+### E5-A4 — Index behavior in a writable repair container + live run
+**Acceptance**
+- Decision recorded: index is pre-edit find-only for the first cut; staleness
+  deferred to E5-E.
+- One real end-to-end repair run through the framework on `astropy-12907`, baseline
+  vs +index, with official grading and a joined sweep.
+
+**Reusability check (the epic's real acceptance, R12):** adding SWE-bench required
+zero changes to `toolpolicy`, `indextool`, `metrics`, and `benchkit.coordinator`.
+If that holds, the abstraction is proven; if not, record exactly where it leaked.
 
 ---
 

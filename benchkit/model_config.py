@@ -1,28 +1,31 @@
 """Model config + token accounting for the framework.
 
-Copied (not shared) from the oracle bench.py to sever benchkit's dependency on a
-loose root script. The oracle retains its own copy as frozen reference; this is the
-maintained one. Faithful to the verified behavior:
-  - config(): mini model/agent/environment config (endpoint, temp 0, token caps);
-    unknown university prices -> cost_tracking ignore, never a measured zero.
-  - metrics(): sum per-response usage once; unknown usage stays null, not zero.
+Small wrapper around the mini-sweagent config system, which is used to
+configure the model, agent, and environment. It also provides a metrics() function
+to summarize the per-response usage from a trajectory.
 """
 
 from __future__ import annotations
 
 import os
 
-MODEL_NAMES = {"small": "small_model", "large": "Qwen/Qwen3.6-35B-A3B-FP8"}
-BASE_URL = "https://xrlab-ie318-3.tmit.bme.hu/v1"
+MODEL_NAMES = {
+    "small": "small_model",
+    "large": "Qwen/Qwen3.6-35B-A3B-FP8",
+}  # the lab model that we use
+BASE_URL = "https://xrlab-ie318-3.tmit.bme.hu/v1"  # the lab API base URL, where the agents live
 
 
 def config(args):
     import yaml
     from minisweagent.config import builtin_config_dir
+
     name = "swebench.yaml" if args.interface == "tools" else "swebench_xml.yaml"
     cfg = yaml.safe_load((builtin_config_dir / "benchmarks" / name).read_text())
-    cfg["agent"].update(step_limit=args.steps, cost_limit=0)
-    # Unknown university prices must not be reported as a measured zero cost.
+    cfg["agent"].update(
+        step_limit=args.steps, cost_limit=0
+    )  # step is the number of actions, we don't care about monetary cost
+
     cfg["model"].update(
         model_name="openai/" + MODEL_NAMES[args.model],
         model_class="litellm" if args.interface == "tools" else "litellm_textbased",
@@ -36,7 +39,8 @@ def config(args):
         },
     )
     cfg["environment"].update(
-        environment_class="docker", timeout=120,
+        environment_class="docker",
+        timeout=120,
         env={**cfg["environment"].get("env", {}), "BASH_ENV": "/root/.bashrc"},
     )
     return cfg
@@ -58,9 +62,13 @@ def metrics(trajectory):
 
     def total(key):
         values = [u.get(key) for u in usages]
-        return sum(values) if values and all(isinstance(v, int) for v in values) else None
+        return (
+            sum(values) if values and all(isinstance(v, int) for v in values) else None
+        )
 
-    prompts = [u["prompt_tokens"] for u in usages if isinstance(u.get("prompt_tokens"), int)]
+    prompts = [
+        u["prompt_tokens"] for u in usages if isinstance(u.get("prompt_tokens"), int)
+    ]
     return {
         "recorded_api_responses": calls,
         "responses_with_usage": len(usages),

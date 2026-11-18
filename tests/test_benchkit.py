@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from benchkit import BenchmarkAdapter, Coordinator, plan_run
+from benchkit import BenchmarkAdapter, Coordinator
 from benchkit.contract import PreparedTask
 from benchkit.swe_explore_adapter import SweExploreAdapter
 
@@ -29,8 +29,10 @@ def _prepared(tmp: Path) -> PreparedTask:
         prepared_dir=tmp,
         repo_dir=repo,
         grading_path=tmp / "benchmark.grading.jsonl",
-        task={"instance_id": "pydata__xarray-4629",
-              "problem_statement": "concat loses attrs"},
+        task={
+            "instance_id": "pydata__xarray-4629",
+            "problem_statement": "concat loses attrs",
+        },
         preparation={"line_counts": counts, "top_k": 5},
     )
 
@@ -40,8 +42,9 @@ class TestAdapterContract(unittest.TestCase):
         self.assertIsInstance(SweExploreAdapter(), BenchmarkAdapter)
 
     def test_required_capabilities(self):
-        self.assertEqual(SweExploreAdapter().required_capabilities(),
-                         ["grep", "read", "submit"])
+        self.assertEqual(
+            SweExploreAdapter().required_capabilities(), ["grep", "read", "submit"]
+        )
 
 
 class TestParseSubmission(unittest.TestCase):
@@ -57,7 +60,9 @@ class TestParseSubmission(unittest.TestCase):
         text = "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\nRELEVANT_FILES:\n- xarray/core/combine.py:10-40"
         sub = self.adapter.parse_submission(text, self.prepared)
         self.assertEqual(sub.kind, "regions")
-        self.assertEqual(sub.payload, [{"path": "xarray/core/combine.py", "start": 10, "end": 40}])
+        self.assertEqual(
+            sub.payload, [{"path": "xarray/core/combine.py", "start": 10, "end": 40}]
+        )
 
     def test_missing_sentinel_rejected(self):
         with self.assertRaises(ValueError):
@@ -101,8 +106,9 @@ class TestCoordinatorPlanning(unittest.TestCase):
 
     def test_index_condition_without_builder_raises(self):
         with self.assertRaises(RuntimeError):
-            self.coord.plan(self.prepared, FIXTURE_POLICY, "baseline_plus_index",
-                            build_index=None)
+            self.coord.plan(
+                self.prepared, FIXTURE_POLICY, "baseline_plus_index", build_index=None
+            )
 
     def test_index_condition_builds_and_mounts(self):
         calls = {}
@@ -112,11 +118,17 @@ class TestCoordinatorPlanning(unittest.TestCase):
             calls["repo"] = str(repo_dir)
             return {"kind": "bm25", "chunk_count": 0, "serialized_path": "index.json"}
 
-        plan = self.coord.plan(self.prepared, FIXTURE_POLICY, "baseline_plus_index",
-                               build_index=fake_builder)
+        plan = self.coord.plan(
+            self.prepared,
+            FIXTURE_POLICY,
+            "baseline_plus_index",
+            build_index=fake_builder,
+        )
         self.assertIsNotNone(plan.index_provenance)
         self.assertTrue(any(m["dst"] == "/index/index.json" for m in plan.env.mounts))
-        self.assertTrue(any(m["dst"].endswith("index_query.py") for m in plan.env.mounts))
+        self.assertTrue(
+            any(m["dst"].endswith("index_query.py") for m in plan.env.mounts)
+        )
         # prompt now describes the added tool (intervention is explicit)
         self.assertIn("index_query", plan.prompt.system_template)
 
@@ -125,11 +137,19 @@ class TestCoordinatorPlanning(unittest.TestCase):
             Path(serialized_out).write_text("{}")
             return {"kind": "bm25"}
 
-        plan = self.coord.plan(self.prepared, FIXTURE_POLICY, "baseline_plus_index",
-                               build_index=fake_builder)
+        plan = self.coord.plan(
+            self.prepared,
+            FIXTURE_POLICY,
+            "baseline_plus_index",
+            build_index=fake_builder,
+        )
         joined = " ".join(plan.env.run_args)
-        for flag in ("--network=none", "--read-only", "--cap-drop=ALL",
-                     "--security-opt=no-new-privileges"):
+        for flag in (
+            "--network=none",
+            "--read-only",
+            "--cap-drop=ALL",
+            "--security-opt=no-new-privileges",
+        ):
             self.assertIn(flag, joined)
         # every index mount is read-only
         self.assertEqual(joined.count("dst=/index/index.json,readonly"), 1)
@@ -138,10 +158,12 @@ class TestCoordinatorPlanning(unittest.TestCase):
 # --- Option B round trip: host serialize -> in-container CLI ---
 try:
     import rank_bm25  # noqa: F401
-    from indextool.bm25 import BM25Payload
+
     from benchkit.index_serialize import serialize_bm25
+    from indextool.bm25 import BM25Payload
+
     _HAS_BM25 = True
-except Exception:
+except ImportError:
     _HAS_BM25 = False
 
 
@@ -149,7 +171,13 @@ except Exception:
 class TestOptionBRoundTrip(unittest.TestCase):
     def test_serialized_index_scores_same_top_file_in_container_cli(self):
         import importlib.util
-        cli_path = Path(__file__).resolve().parent.parent / "benchkit" / "in_container" / "index_query.py"
+
+        cli_path = (
+            Path(__file__).resolve().parent.parent
+            / "benchkit"
+            / "in_container"
+            / "index_query.py"
+        )
         spec = importlib.util.spec_from_file_location("index_query_cli", cli_path)
         cli = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cli)
@@ -175,6 +203,7 @@ class TestOptionBRoundTrip(unittest.TestCase):
 
             import io
             from contextlib import redirect_stdout
+
             buf = io.StringIO()
             with redirect_stdout(buf):
                 rc = cli.main(["combine datasets keep attrs", "--top-k", "1"])
@@ -186,14 +215,21 @@ class TestOptionBRoundTrip(unittest.TestCase):
 class TestNudgeStyle(unittest.TestCase):
     def setUp(self):
         from toolpolicy import load_policy
+
         self.policy = load_policy(FIXTURE_POLICY)
         self.adapter = SweExploreAdapter()
 
     def _prompt(self, condition):
         from toolpolicy import resolve
-        eff = resolve(self.policy, condition,
-                      required_capabilities=self.adapter.required_capabilities())
-        return eff, self.adapter.agent_prompt({"instance_id": "x", "problem_statement": "y"}, eff)
+
+        eff = resolve(
+            self.policy,
+            condition,
+            required_capabilities=self.adapter.required_capabilities(),
+        )
+        return eff, self.adapter.agent_prompt(
+            {"instance_id": "x", "problem_statement": "y"}, eff
+        )
 
     def test_neutral_does_not_encourage(self):
         eff, prompt = self._prompt("baseline_plus_index")
@@ -214,8 +250,12 @@ class TestNudgeStyle(unittest.TestCase):
 
     def test_nudge_is_only_difference(self):
         from toolpolicy import resolve
+
         n = {t["name"]: t for t in resolve(self.policy, "baseline_plus_index")["tools"]}
-        e = {t["name"]: t for t in resolve(self.policy, "baseline_plus_index_encouraged")["tools"]}
+        e = {
+            t["name"]: t
+            for t in resolve(self.policy, "baseline_plus_index_encouraged")["tools"]
+        }
         self.assertEqual(set(n), set(e))
         diffs = {k for k in n if n[k] != e[k]}
         self.assertEqual(diffs, {"index_query"})

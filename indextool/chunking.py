@@ -1,20 +1,29 @@
-"""Overlapping line-window chunking (E2).
+"""Overlapping line-window chunking.
 
-Reimplemented in-package (not imported from the oracle explore-evaluator-src) so
-indextool has no dependency on reference code. Same shape: 1-based inclusive line
-ranges, source-extension filter.
+1-based inclusive line ranges, source-extension filter.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 SOURCE_EXTS = {
-    ".py", ".md", ".txt", ".toml", ".cfg", ".ini",
-    ".yaml", ".yml", ".json", ".rst",
+    ".py",
+    ".md",
+    ".txt",
+    ".toml",
+    ".cfg",
+    ".ini",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".rst",
 }
+DEFAULT_CHUNK_SIZE = 80
+DEFAULT_CHUNK_OVERLAP = 20
+DEFAULT_MAX_CHUNKS = 3000
 
 
 @dataclass
@@ -34,9 +43,9 @@ def iter_source_files(repo_root: Path) -> Iterable[Path]:
 def chunk_repo(
     repo_root: Path,
     *,
-    chunk_size: int = 80,
-    chunk_overlap: int = 20,
-    max_chunks: int = 3000,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
+    max_chunks: int = DEFAULT_MAX_CHUNKS,
 ) -> list[Chunk]:
     step = max(1, chunk_size - chunk_overlap)
     chunks: list[Chunk] = []
@@ -53,7 +62,9 @@ def chunk_repo(
             end_idx = min(i + chunk_size, len(lines))
             content = "\n".join(lines[i:end_idx])
             if content.strip():
-                chunks.append(Chunk(path=rel, start=i + 1, end=end_idx, content=content))
+                chunks.append(
+                    Chunk(path=rel, start=i + 1, end=end_idx, content=content)
+                )
             if end_idx >= len(lines):
                 break
             if len(chunks) >= max_chunks:

@@ -4,7 +4,7 @@ __pycache__/
 runs/
 installed-*.txt
 
-# Vendored third-party sources (clone on demand per README; they carry their
+# Vendored third-party sources (clone on demand per README, they carry their
 # own git history and licenses, so they are not committed into this repo).
 evaluator-src/
 explore-evaluator-src/
@@ -14,3 +14,4 @@ repobench-src/
 # downloaded repository snapshots.
 explore-input/
 repobench-input/
+swebench-input/

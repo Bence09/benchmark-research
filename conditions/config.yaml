@@ -1,32 +1,31 @@
-# Tool-policy conditions. One file, many named conditions; a run selects one (D1).
-# Conditions use `extends` (D2) so each states only its delta (R2).
+# Tool-policy conditions. One file, many named conditions; a run selects one.
+# Conditions use `extends` so each states only its delta.
 #
-# The tool *vocabulary* is benchmark-agnostic: grep/read/edit/run/submit/network and
+# The tool vocabulary is benchmark-agnostic: grep/read/edit/run/submit/network and
 # the index_query block mean the same thing regardless of which benchmark runs. Those
 # shared definitions are declared once as YAML anchors (&name) below and referenced
-# (*name) in conditions. What differs per benchmark is only *which* tools form its
-# required floor (SWE-Explore localization: grep/read/submit; SWE-bench repair adds
-# edit/run) -- that difference is load-bearing for R4 validation, so baselines stay
-# explicit rather than merged.
+# (*name) in conditions. What differs per benchmark is only which tools form its
+# required level (SWE-Explore: grep/read/submit, SWE-bench repair adds
+# edit/run)
 version: 1
 
-# --- shared tool vocabulary (anchors; not conditions themselves) ---
+# --- shared tool vocabulary (anchors) ---
 _defs:
   directives:
     allow: &allow { directive: allow }
-    deny:  &deny  { directive: deny }
+    deny: &deny { directive: deny }
   # The index_query tool, defined once. neutral vs encouraged differ only by the
   # recorded description_style, so each is its own anchor over a shared payload.
   index_neutral: &index_neutral
     directive: add
-    payload: { kind: bm25, index_ref: null, stale: false }   # D4: opaque, swappable
-    limits:  { top_k: 10, max_snippet_bytes: 2048, timeout_seconds: 30 }
-    result_shape: pointers_plus_snippet                      # E0-S5
+    payload: { kind: bm25, index_ref: null, stale: false } # D4: opaque, swappable
+    limits: { top_k: 10, max_snippet_bytes: 2048, timeout_seconds: 30 }
+    result_shape: pointers_plus_snippet # E0-S5
     description_style: neutral
   index_encouraged: &index_encouraged
     directive: add
     payload: { kind: bm25, index_ref: null, stale: false }
-    limits:  { top_k: 10, max_snippet_bytes: 2048, timeout_seconds: 30 }
+    limits: { top_k: 10, max_snippet_bytes: 2048, timeout_seconds: 30 }
     result_shape: pointers_plus_snippet
     description_style: encouraged
 
@@ -35,10 +34,10 @@ conditions:
   baseline:
     description: "Task-scoped search: grep + read + submit. Network off."
     tools:
-      grep:    *allow
-      read:    *allow
-      submit:  *allow
-      network: *deny        # enforced via container netns=none (D5)
+      grep: *allow
+      read: *allow
+      submit: *allow
+      network: *deny # enforced via container netns=none (D5)
 
   baseline_plus_index:
     extends: baseline
@@ -56,11 +55,11 @@ conditions:
   swebench_baseline:
     description: "SWE-bench repair floor: grep + read + edit + run + submit."
     tools:
-      grep:    *allow
-      read:    *allow
-      edit:    *allow       # soft 'allow': agent exercises it via bash in a writable container
-      run:     *allow
-      submit:  *allow
+      grep: *allow
+      read: *allow
+      edit: *allow # soft 'allow': agent exercises it via bash in a writable container
+      run: *allow
+      submit: *allow
       network: *deny
 
   swebench_plus_index:

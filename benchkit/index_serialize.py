@@ -1,6 +1,6 @@
-"""Serialized index format (Option B, host side).
+"""Serialized index format.
 
-At prepare time we build the index on the host (E2 payload) and serialize it to a
+At prepare time we build the index on the host and serialize it to a
 single JSON file. That file is mounted read-only into the locked-down container,
 where the pure-Python `index_query` CLI reads it with no third-party deps.
 
@@ -15,13 +15,15 @@ import json
 import math
 from pathlib import Path
 
+# Version of the serialized index format. Increase when the on-disk layout changes, so both
+# the host and container agree on the format.
 SERIALIZER_VERSION = 1
 
 
 def serialize_bm25(payload, build_info, out_path: Path) -> dict:
     """Serialize a built BM25Payload to a self-contained JSON index.
 
-    Stores per-chunk {path,start,end,tokens} and corpus stats so the container-side
+    Stores per-chunk {path,start,end,tokens} and stats so the container-side
     CLI can score BM25 without rank_bm25. Returns the index.json provenance block.
     """
     chunks = payload._chunks  # built chunk table
@@ -41,8 +43,9 @@ def serialize_bm25(payload, build_info, out_path: Path) -> dict:
         tf: dict[str, int] = {}
         for term in toks:
             tf[term] = tf.get(term, 0) + 1
-        records.append({"path": c.path, "start": c.start, "end": c.end, "tf": tf,
-                         "len": len(toks)})
+        records.append(
+            {"path": c.path, "start": c.start, "end": c.end, "tf": tf, "len": len(toks)}
+        )
 
     index = {
         "serializer_version": SERIALIZER_VERSION,
@@ -54,11 +57,14 @@ def serialize_bm25(payload, build_info, out_path: Path) -> dict:
     }
     out_path = Path(out_path)
     out_path.write_text(json.dumps(index, ensure_ascii=False))
-    return {**build_info.to_dict(), "serialized_path": out_path.name,
-            "serialized_bytes": out_path.stat().st_size,
-            "serializer_version": SERIALIZER_VERSION}
+    return {
+        **build_info.to_dict(),
+        "serialized_path": out_path.name,
+        "serialized_bytes": out_path.stat().st_size,
+        "serializer_version": SERIALIZER_VERSION,
+    }
 
 
 def idf(df_t: int, n: int) -> float:
-    # BM25 idf with +0.5 smoothing (Okapi).
+    # BM25 idf with +0.5 smoothing.
     return math.log(1 + (n - df_t + 0.5) / (df_t + 0.5))

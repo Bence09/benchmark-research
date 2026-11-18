@@ -80,7 +80,7 @@ class TestBoundary(unittest.TestCase):
 
     def test_payload_exception_becomes_observation(self):
         self.payload.raise_on_query = True
-        obs, rec = self.boundary.handle('index_query "q"')
+        _obs, rec = self.boundary.handle('index_query "q"')
         self.assertIn("ValueError", rec.error)
         self.assertIsNotNone(rec.latency_seconds)
 
@@ -125,10 +125,12 @@ class TestChunker(unittest.TestCase):
 
 
 try:
-    from indextool.bm25 import BM25Payload, BM25Unavailable
     import rank_bm25  # noqa: F401
+
+    from indextool.bm25 import BM25Payload
+
     _HAS_BM25 = True
-except Exception:
+except ImportError:
     _HAS_BM25 = False
 
 

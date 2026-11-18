@@ -22,8 +22,12 @@ class TestSchemaValid(unittest.TestCase):
         self.assertIn("baseline_plus_index", data["conditions"])
 
     def test_dict_source_accepted(self):
-        data = load_policy(_policy(baseline={"tools": {"grep": {"directive": "allow"}}}))
-        self.assertEqual(data["conditions"]["baseline"]["tools"]["grep"]["directive"], "allow")
+        data = load_policy(
+            _policy(baseline={"tools": {"grep": {"directive": "allow"}}})
+        )
+        self.assertEqual(
+            data["conditions"]["baseline"]["tools"]["grep"]["directive"], "allow"
+        )
 
 
 class TestSchemaRejections(unittest.TestCase):
@@ -45,7 +49,9 @@ class TestSchemaRejections(unittest.TestCase):
 
     def test_add_without_payload_kind(self):
         with self.assertRaises(PolicyError):
-            load_policy(_policy(a={"tools": {"idx": {"directive": "add", "payload": {}}}}))
+            load_policy(
+                _policy(a={"tools": {"idx": {"directive": "add", "payload": {}}}})
+            )
 
     def test_add_without_payload_at_all(self):
         with self.assertRaises(PolicyError):
@@ -65,7 +71,9 @@ class TestSchemaRejections(unittest.TestCase):
 
     def test_limits_not_mapping(self):
         with self.assertRaises(PolicyError):
-            load_policy(_policy(a={"tools": {"grep": {"directive": "allow", "limits": 5}}}))
+            load_policy(
+                _policy(a={"tools": {"grep": {"directive": "allow", "limits": 5}}})
+            )
 
 
 if __name__ == "__main__":

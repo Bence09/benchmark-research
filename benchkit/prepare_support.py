@@ -1,4 +1,4 @@
-"""Prepare-time helpers shared by adapters (in-package, not imported from oracle)."""
+"""Prepare-time helpers shared by adapters."""
 
 from __future__ import annotations
 
@@ -10,7 +10,11 @@ def line_counts(repo: Path) -> dict[str, int]:
     repo = Path(repo).resolve()
     result: dict[str, int] = {}
     for path in repo.rglob("*"):
-        if path.is_file() and not path.is_symlink() and ".git" not in path.relative_to(repo).parts:
+        if (
+            path.is_file()
+            and not path.is_symlink()
+            and ".git" not in path.relative_to(repo).parts
+        ):
             try:
                 result[path.relative_to(repo).as_posix()] = len(
                     path.read_text(encoding="utf-8").splitlines()

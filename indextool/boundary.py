@@ -1,4 +1,4 @@
-"""Agent-facing tool boundary (E2-S1).
+"""Agent-facing tool boundary.
 
 The frozen contract the agent calls. Parses one `index_query` call, clamps top_k
 to the policy limit, runs the payload, truncates delivered snippet bytes, and
@@ -20,8 +20,13 @@ TOOL_NAME = "index_query"
 
 
 class ToolBoundary:
-    def __init__(self, payload: IndexPayload, *, max_top_k: int = 10,
-                 max_snippet_bytes: int = 2048) -> None:
+    def __init__(
+        self,
+        payload: IndexPayload,
+        *,
+        max_top_k: int = 10,
+        max_snippet_bytes: int = 2048,
+    ) -> None:
         self.payload = payload
         self.max_top_k = max_top_k
         self.max_snippet_bytes = max_snippet_bytes
@@ -41,7 +46,7 @@ class ToolBoundary:
         started = time.monotonic()
         try:
             regions = self.payload.query(query, top_k)
-        except Exception as exc:  # payload failure is an observation, not a crash
+        except Exception as exc:  # noqa: BLE001 - payload failures become observations.
             rec.latency_seconds = time.monotonic() - started
             rec.error = f"{type(exc).__name__}: {exc}"
             return self._render_error(rec.error), rec
@@ -52,7 +57,9 @@ class ToolBoundary:
             {"path": r.path, "start": r.start, "end": r.end, "score": round(r.score, 4)}
             for r in regions
         ]
-        rec.bytes_delivered = sum(len((r.snippet or "").encode("utf-8")) for r in regions)
+        rec.bytes_delivered = sum(
+            len((r.snippet or "").encode("utf-8")) for r in regions
+        )
         return self._render(regions), rec
 
     def _parse(self, raw_call: str):
@@ -90,7 +97,9 @@ class ToolBoundary:
             if r.snippet is not None:
                 b = r.snippet.encode("utf-8")
                 if len(b) > self.max_snippet_bytes:
-                    r.snippet = b[: self.max_snippet_bytes].decode("utf-8", errors="ignore")
+                    r.snippet = b[: self.max_snippet_bytes].decode(
+                        "utf-8", errors="ignore"
+                    )
         return regions
 
     def _render(self, regions: list[Region]) -> str:

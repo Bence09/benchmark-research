@@ -1,21 +1,20 @@
-"""Load and validate a tool-policy YAML file (E1-S1).
+"""Load and validate a tool-policy YAML file.
 
-Grammar (see docs/BACKLOG.md E1, D1/D3/D4/D6):
+Grammar:
 
     version: 1
     conditions:
       <name>:
         description: <str, optional>
-        extends: <parent condition name, optional>   # D2 additivity
+        extends: <parent condition name, optional>
         tools:
           <tool>:
-            directive: allow | add | deny | remove    # D3
-            payload: {kind: <str>, ...}               # required for 'add' (D4, opaque)
+            directive: allow | add | deny | remove
+            payload: {kind: <str>, ...}               # required for 'add'
             limits:  {<str>: <num>, ...}              # optional
             result_shape: <str>                       # optional
 
-This module only parses and structurally validates. It does NOT apply `extends`
-or derive enforcement status; that is the resolver's job (E1-S2).
+This module only parses and structurally validates.
 """
 
 from __future__ import annotations
@@ -25,17 +24,17 @@ from typing import Any
 
 DIRECTIVES = {"allow", "add", "deny", "remove"}
 
-# Directives that are only ever best-effort under the first-cut (soft) enforcement.
-# `remove` is in the grammar but parked for strict enforcement (E5-B).
+# Directives that are only ever best-effort under the soft enforcement.
+# `remove` is in the grammar but parked for strict enforcement just yet.
 BEST_EFFORT_ONLY = {"remove"}
 
 
 class PolicyError(ValueError):
-    """Raised for any malformed or contradictory policy (R10: never silently weaken)."""
+    """Raised for any malformed or contradictory policy."""
 
 
 def load_policy(source: str | Path | dict) -> dict:
-    """Parse and structurally validate a policy. Returns the raw (unresolved) dict.
+    """Parse and structurally validate a policy. Returns the raw dict.
 
     `source` may be a path, a YAML string, or an already-parsed dict (for tests).
     """
@@ -64,13 +63,15 @@ def _read(source: str | Path | dict) -> dict:
 def _looks_like_path(source: str | Path) -> bool:
     if isinstance(source, Path):
         return True
-    # A YAML document contains a newline or a colon; a path usually does not.
+    # A YAML document contains a newline or a colon, a path usually does not.
     return "\n" not in source and source.strip().endswith((".yaml", ".yml"))
 
 
 def _validate_top_level(data: dict) -> None:
     if data.get("version") != 1:
-        raise PolicyError(f"unsupported policy version: {data.get('version')!r} (expected 1)")
+        raise PolicyError(
+            f"unsupported policy version: {data.get('version')!r} (expected 1)"
+        )
     conditions = data.get("conditions")
     if not isinstance(conditions, dict) or not conditions:
         raise PolicyError("policy must define a non-empty 'conditions' mapping")
@@ -105,7 +106,7 @@ def _validate_tool(cond_name: str, tool: str, spec: Any) -> None:
             f"(expected one of {sorted(DIRECTIVES)})"
         )
 
-    # D4: 'add' must carry an opaque payload with a 'kind'; we never interpret kind.
+    # 'add' must carry an payload (index or RAG) with a 'kind', we don't interpret kind here.
     if directive == "add":
         payload = spec.get("payload")
         if not isinstance(payload, dict) or not payload.get("kind"):

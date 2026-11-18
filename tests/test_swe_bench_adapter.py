@@ -9,9 +9,9 @@ import unittest
 from pathlib import Path
 
 from benchkit import BenchmarkAdapter
-from benchkit.contract import PreparedTask, Submission
+from benchkit.contract import PreparedTask
 from benchkit.swe_bench_adapter import SweBenchAdapter
-from metrics import classify_failure, FailureCategory
+from metrics import FailureCategory, classify_failure
 
 FIXTURE_POLICY = Path(__file__).resolve().parent.parent / "conditions" / "config.yaml"
 
@@ -28,11 +28,17 @@ index a308e2729..45bea3608 100755
 def _prepared():
     return PreparedTask(
         instance_id="astropy__astropy-12907",
-        prepared_dir=Path("/tmp/none"), repo_dir=Path("/tmp/none"),
+        prepared_dir=Path("/tmp/none"),
+        repo_dir=Path("/tmp/none"),
         grading_path=Path("/tmp/none/grading.json"),
-        task={"instance_id": "astropy__astropy-12907", "repo": "astropy/astropy",
-              "base_commit": "d16bfe", "problem_statement": "bug"},
-        preparation={})
+        task={
+            "instance_id": "astropy__astropy-12907",
+            "repo": "astropy/astropy",
+            "base_commit": "d16bfe",
+            "problem_statement": "bug",
+        },
+        preparation={},
+    )
 
 
 class TestConformance(unittest.TestCase):
@@ -40,8 +46,10 @@ class TestConformance(unittest.TestCase):
         self.assertIsInstance(SweBenchAdapter(), BenchmarkAdapter)
 
     def test_required_capabilities_is_repair_floor(self):
-        self.assertEqual(SweBenchAdapter().required_capabilities(),
-                         ["grep", "read", "edit", "run", "submit"])
+        self.assertEqual(
+            SweBenchAdapter().required_capabilities(),
+            ["grep", "read", "edit", "run", "submit"],
+        )
 
 
 class TestPatchParsing(unittest.TestCase):
@@ -72,6 +80,7 @@ class TestPatchParsing(unittest.TestCase):
 class TestPrompt(unittest.TestCase):
     def test_prompt_mentions_index_only_when_added(self):
         from toolpolicy import load_policy, resolve
+
         a = SweBenchAdapter()
         p = load_policy(FIXTURE_POLICY)
         base = resolve(p, "baseline", required_capabilities=[])
@@ -86,15 +95,19 @@ class TestRepairFailureMapping(unittest.TestCase):
     def test_resolved_is_ok(self):
         self.assertEqual(
             classify_failure("Submitted", has_valid_submission=True, resolved=True),
-            FailureCategory.OK)
+            FailureCategory.OK,
+        )
 
     def test_valid_patch_unresolved_is_valid_but_wrong(self):
         self.assertEqual(
             classify_failure("Submitted", has_valid_submission=True, resolved=False),
-            FailureCategory.VALID_BUT_WRONG)
+            FailureCategory.VALID_BUT_WRONG,
+        )
 
     def test_no_patch_limit_is_output_limit(self):
-        self.assertEqual(classify_failure("LimitsExceeded"), FailureCategory.OUTPUT_LIMIT)
+        self.assertEqual(
+            classify_failure("LimitsExceeded"), FailureCategory.OUTPUT_LIMIT
+        )
 
     def test_setup_is_infra(self):
         self.assertEqual(classify_failure("SetupError"), FailureCategory.INFRA)

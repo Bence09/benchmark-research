@@ -53,7 +53,24 @@ deliberately a separate environment from older mini-SWE-agent installations.
 Transitive dependencies are resolved at install time; preserve `installed-agent.txt`
 and each run's `packages.txt` and use that dependency snapshot across experiments.
 
-## 2. Set the API key without putting it into command history
+## 2. Development commands
+
+The Makefile provides common repository workflows after creating the agent environment:
+
+```bash
+make setup           # create environments and vendored evaluator sources
+make requirements    # install the pinned agent dependencies
+make build           # compile Python sources
+make test            # run the offline unittest suite
+make format-check    # verify Ruff formatting without changing files
+make format          # apply Ruff formatting
+make lint            # run Ruff lint checks
+make check           # run formatting, lint, and tests
+```
+
+Use `make format-check` in CI or before committing; use `make format` to apply changes locally.
+
+## 3. Set the API key without putting it into command history
 
 ```bash
 read -rsp 'BME API key: ' OPENAI_API_KEY
@@ -64,7 +81,7 @@ export BME_API_BASE='https://xrlab-ie318-3.tmit.bme.hu/v1'
 
 Do not put keys in model configuration, task prompts or uploaded logs.
 
-## 3. Test action compatibility
+## 4. Test action compatibility
 
 ```bash
 python bench.py probe --model small --interface tools
@@ -85,7 +102,7 @@ check the server's chat template/reasoning/tool parser configuration. This start
 does not promote reasoning into executable output. A successful prose response
 alone does not establish action compatibility.
 
-## 4. Prepare and run the known smoke task
+## 5. Prepare and run the known smoke task
 
 Plan only (downloads/selects dataset, writes metadata, does not run an agent):
 
@@ -123,7 +140,7 @@ dataset commit: `--dataset-revision COMMIT_SHA`. The exact selected records are
 saved and hashed even when `main` is used. Pin Docker images by digest before a
 reported campaign; this starter uses mini's upstream task image mapping/tags.
 
-## 5. Evaluate separately
+## 6. Evaluate separately
 
 Your saved Kiro run notes document using SWE-bench tag `v2.1.7` after a schema
 problem with a newer harness. Reuse that known evaluator first if it is still
@@ -151,7 +168,7 @@ An evaluator process exiting successfully is **not** evidence the issue resolved
 read the official resolved/unresolved result. CSV summaries do not yet merge
 official grading, which remains authoritative in the harness report.
 
-## 6. Expand cautiously
+## 7. Expand cautiously
 
 ```bash
 python bench.py run --model large --interface tools --execute

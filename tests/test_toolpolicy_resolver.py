@@ -41,16 +41,18 @@ class TestResolveFixture(unittest.TestCase):
 
     def test_enforcement_derivation(self):
         tools = _by_name(resolve(self.policy, "baseline_plus_index"))
-        self.assertEqual(tools["network"]["enforcement"], "enforced")   # D5 hard-enforceable
+        self.assertEqual(
+            tools["network"]["enforcement"], "enforced"
+        )  # D5 hard-enforceable
         self.assertEqual(tools["network"]["status"], "denied")
-        self.assertEqual(tools["grep"]["enforcement"], "n/a")           # allow
+        self.assertEqual(tools["grep"]["enforcement"], "n/a")  # allow
         self.assertEqual(tools["index_query"]["enforcement"], "best-effort")  # add
         self.assertEqual(tools["index_query"]["status"], "added")
 
     def test_payload_is_surfaced_but_opaque(self):
         idx = _by_name(resolve(self.policy, "baseline_plus_index"))["index_query"]
-        self.assertEqual(idx["payload_kind"], "bm25")       # surfaced
-        self.assertIsNone(idx["index_ref_sha256"])          # null until prepare (E2)
+        self.assertEqual(idx["payload_kind"], "bm25")  # surfaced
+        self.assertIsNone(idx["index_ref_sha256"])  # null until prepare (E2)
         self.assertEqual(idx["result_shape"], "pointers_plus_snippet")
 
     def test_hashes_present_and_differ(self):
@@ -67,20 +69,25 @@ class TestRequiredCapabilities(unittest.TestCase):
         self.policy = load_policy(FIXTURE)
 
     def test_required_present_ok(self):
-        resolve(self.policy, "baseline", required_capabilities=["grep", "read", "submit"])
+        resolve(
+            self.policy, "baseline", required_capabilities=["grep", "read", "submit"]
+        )
 
     def test_missing_required_rejected_before_run(self):
         with self.assertRaises(ResolutionError):
             resolve(self.policy, "baseline", required_capabilities=["index_query"])
 
     def test_added_tool_satisfies_required(self):
-        resolve(self.policy, "baseline_plus_index", required_capabilities=["index_query"])
+        resolve(
+            self.policy, "baseline_plus_index", required_capabilities=["index_query"]
+        )
 
 
 class TestEdgeCases(unittest.TestCase):
     def test_no_condition_is_untouched_default(self):
-        eff = resolve({"version": 1, "conditions": {}} if False else
-                      load_policy(FIXTURE), None)
+        eff = resolve(
+            {"version": 1, "conditions": {}} if False else load_policy(FIXTURE), None
+        )
         self.assertIsNone(eff["condition"])
         self.assertTrue(eff["default_environment"])
         self.assertEqual(eff["tools"], [])
@@ -94,7 +101,9 @@ class TestEdgeCases(unittest.TestCase):
         policy = {
             "version": 1,
             "conditions": {
-                "a": {"tools": {"idx": {"directive": "add", "payload": {"kind": "bm25"}}}},
+                "a": {
+                    "tools": {"idx": {"directive": "add", "payload": {"kind": "bm25"}}}
+                },
                 "b": {"extends": "a", "tools": {"idx": {"directive": "remove"}}},
             },
         }

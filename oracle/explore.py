@@ -1,27 +1,41 @@
 #!/usr/bin/env python3
 """SWE-Explore adapter for the research-bench-starter's mini-SWE-agent setup."""
+
 import argparse
 import hashlib
 import importlib.util
 import io
 import json
 import os
-from pathlib import Path, PurePosixPath
 import re
 import subprocess
-import sys
 import tarfile
 import time
 import urllib.request
 import uuid
+from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parent
 INSTANCE = "pydata__xarray-4629"
 EVALUATOR_SHA = "5602f031f2d9562d0a805f83402b536e831a5a11"
-METRICS = ["precision", "recall", "f1_score", "hit_file_rate", "noise_file_rate",
-           "hit_region_rate", "noise_region_rate", "weighted_core_coverage",
-           "context_efficiency", "recall_at_100", "recall_at_300", "recall_at_500",
-           "ndcg_at_100", "ndcg_at_300", "ndcg_at_500", "first_useful_hit"]
+METRICS = [
+    "precision",
+    "recall",
+    "f1_score",
+    "hit_file_rate",
+    "noise_file_rate",
+    "hit_region_rate",
+    "noise_region_rate",
+    "weighted_core_coverage",
+    "context_efficiency",
+    "recall_at_100",
+    "recall_at_300",
+    "recall_at_500",
+    "ndcg_at_100",
+    "ndcg_at_300",
+    "ndcg_at_500",
+    "first_useful_hit",
+]
 
 
 def dump(path, value):
@@ -33,13 +47,19 @@ def digest(path):
 
 
 def select_record(path, instance):
-    rows = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+    rows = [
+        json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()
+    ]
     found = [r for r in rows if r.get("instance_id") == instance]
     if len(found) != 1:
         raise ValueError(f"Expected one {instance} record, found {len(found)}")
     row = found[0]
-    if not isinstance(row.get("ground_truth"), dict) or not row["ground_truth"].get("read_core_regions"):
-        raise ValueError("Expected normalized SWE-Explore JSONL with nonempty ground_truth.read_core_regions")
+    if not isinstance(row.get("ground_truth"), dict) or not row["ground_truth"].get(
+        "read_core_regions"
+    ):
+        raise ValueError(
+            "Expected normalized SWE-Explore JSONL with nonempty ground_truth.read_core_regions"
+        )
     return row
 
 
@@ -63,25 +83,34 @@ def unpack_snapshot(data, destination):
                 with archive.extractfile(member) as source:
                     target.write_bytes(source.read())
             elif member.issym() or member.islnk():
-                raise ValueError("Repository archive contains links; prepare manually after reviewing them")
+                raise ValueError(
+                    "Repository archive contains links; prepare manually after reviewing them"
+                )
             else:
                 raise ValueError("Unsupported archive member")
 
 
 def prepare(args):
     from datasets import load_dataset
+
     record = select_record(args.bench, args.instance)
     # Source metadata supplies only issue/repo/base commit, never its gold patch.
-    dataset = load_dataset(args.task_dataset, split=args.task_split, revision=args.task_revision)
+    dataset = load_dataset(
+        args.task_dataset, split=args.task_split, revision=args.task_revision
+    )
     found = [r for r in dataset if r.get("instance_id") == args.instance]
     if len(found) != 1:
-        raise SystemExit("Task not found in source dataset. Supply the correct --task-dataset/--task-split.")
+        raise SystemExit(
+            "Task not found in source dataset. Supply the correct --task-dataset/--task-split."
+        )
     source = found[0]
     commit = source["base_commit"]
     meta = record.get("meta") or {}
     stated_commit = record.get("base_commit") or meta.get("base_commit")
     if stated_commit and stated_commit != commit:
-        raise SystemExit("Explore and source dataset base commits differ; resolve mapping before running.")
+        raise SystemExit(
+            "Explore and source dataset base commits differ; resolve mapping before running."
+        )
     if not re.fullmatch(r"[0-9a-fA-F]{40}", commit):
         raise SystemExit("Expected a full 40-character base commit.")
     repo = source["repo"]
@@ -91,10 +120,15 @@ def prepare(args):
     out.mkdir(parents=True, exist_ok=False)
     # Grading record stays outside the mounted repository.
     (out / "benchmark.grading.jsonl").write_text(json.dumps(record) + "\n")
-    task = {k: source[k] for k in ("instance_id", "repo", "base_commit", "problem_statement")}
+    task = {
+        k: source[k]
+        for k in ("instance_id", "repo", "base_commit", "problem_statement")
+    }
     dump(out / "task.json", task)
     url = f"https://api.github.com/repos/{repo}/tarball/{commit}"
-    request = urllib.request.Request(url, headers={"User-Agent": "research-bench-explore"})
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "research-bench-explore"}
+    )
     with urllib.request.urlopen(request, timeout=120) as response:
         data = response.read()
     unpack_snapshot(data, out / "repo")
@@ -102,14 +136,29 @@ def prepare(args):
     counts = line_counts(out / "repo")
     for region in record["ground_truth"]["read_core_regions"]:
         path, start, end = region_values(region)
-        if path not in counts or start < 1 or (end != -1 and not start <= end <= counts[path]):
-            raise ValueError(f"Ground-truth region does not match snapshot: {path}:{start}-{end}")
-    dump(out / "preparation.json", {"instance_id": args.instance, "repo": repo,
-        "base_commit": commit, "base_commit_cross_checked_in_explore_record": bool(stated_commit),
-        "source_dataset": args.task_dataset, "source_revision": args.task_revision,
-        "source_fingerprint": dataset._fingerprint, "archive_sha256": hashlib.sha256(data).hexdigest(),
-        "grading_sha256": digest(out / "benchmark.grading.jsonl"),
-        "task_sha256": digest(out / "task.json")})
+        if (
+            path not in counts
+            or start < 1
+            or (end != -1 and not start <= end <= counts[path])
+        ):
+            raise ValueError(
+                f"Ground-truth region does not match snapshot: {path}:{start}-{end}"
+            )
+    dump(
+        out / "preparation.json",
+        {
+            "instance_id": args.instance,
+            "repo": repo,
+            "base_commit": commit,
+            "base_commit_cross_checked_in_explore_record": bool(stated_commit),
+            "source_dataset": args.task_dataset,
+            "source_revision": args.task_revision,
+            "source_fingerprint": dataset._fingerprint,
+            "archive_sha256": hashlib.sha256(data).hexdigest(),
+            "grading_sha256": digest(out / "benchmark.grading.jsonl"),
+            "task_sha256": digest(out / "task.json"),
+        },
+    )
     print("Prepared:", out)
     print("No model calls made. Gold labels stay outside the repository mount.")
 
@@ -118,16 +167,26 @@ def line_counts(repo):
     repo = Path(repo).resolve()
     result = {}
     for path in repo.rglob("*"):
-        if path.is_file() and not path.is_symlink() and ".git" not in path.relative_to(repo).parts:
+        if (
+            path.is_file()
+            and not path.is_symlink()
+            and ".git" not in path.relative_to(repo).parts
+        ):
             try:
-                result[path.relative_to(repo).as_posix()] = len(path.read_text(encoding="utf-8").splitlines())
+                result[path.relative_to(repo).as_posix()] = len(
+                    path.read_text(encoding="utf-8").splitlines()
+                )
             except (UnicodeError, OSError):
                 pass
     return result
 
 
 def region_values(region):
-    return (region["path"], region["start"], region["end"]) if isinstance(region, dict) else tuple(region)
+    return (
+        (region["path"], region["start"], region["end"])
+        if isinstance(region, dict)
+        else tuple(region)
+    )
 
 
 def parse_regions(text, counts, top_k):
@@ -142,7 +201,12 @@ def parse_regions(text, counts, top_k):
             raise ValueError("Expected '- relative/path.py:start-end' for each region")
         path, start, end = match.group(1), int(match.group(2)), int(match.group(3))
         parts = PurePosixPath(path)
-        if parts.is_absolute() or ".." in parts.parts or "\\" in path or path not in counts:
+        if (
+            parts.is_absolute()
+            or ".." in parts.parts
+            or "\\" in path
+            or path not in counts
+        ):
             raise ValueError(f"Invalid repository-relative path: {path}")
         if not 1 <= start <= end <= counts[path]:
             raise ValueError(f"Invalid line range for {path}")
@@ -179,6 +243,7 @@ def run(args):
     from minisweagent.agents.default import DefaultAgent
     from minisweagent.environments.docker import DockerEnvironment
     from minisweagent.models import get_model
+
     prepared = Path(args.prepared).expanduser().absolute()
     task = json.loads((prepared / "task.json").read_text())
     prep = json.loads((prepared / "preparation.json").read_text())
@@ -187,25 +252,66 @@ def run(args):
     subprocess.run(["docker", "info"], stdout=subprocess.DEVNULL, check=True)
     # Use a dedicated lightweight tools image; no project dependencies needed.
     subprocess.run(["docker", "pull", args.image], check=True)
-    image = subprocess.check_output(["docker", "image", "inspect", args.image, "--format", "{{.Id}}"], text=True).strip()
-    label = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-explore-" + uuid.uuid4().hex[:8]
+    image = subprocess.check_output(
+        ["docker", "image", "inspect", args.image, "--format", "{{.Id}}"], text=True
+    ).strip()
+    label = (
+        time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        + "-explore-"
+        + uuid.uuid4().hex[:8]
+    )
     out = ROOT / "runs" / label
     out.mkdir(parents=True)
     # Reuse connection settings and accounting, but replace the repair prompt.
-    settings = argparse.Namespace(interface="tools", model=args.model, steps=args.steps, output_tokens=args.output_tokens)
+    settings = argparse.Namespace(
+        interface="tools",
+        model=args.model,
+        steps=args.steps,
+        output_tokens=args.output_tokens,
+    )
     cfg = bench.config(settings)
     agent_cfg = cfg["agent"]
-    agent_cfg.update(system_template=SYSTEM, instance_template="ISSUE:\n{{task}}\nReturn up to {{top_k}} regions within {{step_limit}} model calls.",
-                     output_path=out / "trajectory.traj.json", wall_time_limit_seconds=args.wall_seconds)
-    env_cfg = dict(image=image, cwd="/repo", timeout=60, pull_timeout=120, interpreter=["bash", "-c"],
-        run_args=["--rm", "--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
-                  "--mount", f"type=bind,src={prepared / 'repo'},dst=/repo,readonly",
-                  "--tmpfs", "/tmp:rw,nosuid,size=64m"], container_timeout=f"{args.wall_seconds + 300}s")
-    dump(out / "manifest.json", {"benchmark": "SWE-Explore", "task": task,
-        "preparation": prep, "prepared_dir": str(prepared), "model": bench.MODEL_NAMES[args.model],
-        "top_k_regions": args.top_k, "steps": args.steps, "output_tokens_per_call": args.output_tokens,
-        "image": image, "wall_time_limit_seconds": args.wall_seconds,
-        "policy": "read-only repository; no container network; submitted ranked regions"})
+    agent_cfg.update(
+        system_template=SYSTEM,
+        instance_template="ISSUE:\n{{task}}\nReturn up to {{top_k}} regions within {{step_limit}} model calls.",
+        output_path=out / "trajectory.traj.json",
+        wall_time_limit_seconds=args.wall_seconds,
+    )
+    env_cfg = {
+        "image": image,
+        "cwd": "/repo",
+        "timeout": 60,
+        "pull_timeout": 120,
+        "interpreter": ["bash", "-c"],
+        "run_args": [
+            "--rm",
+            "--network=none",
+            "--read-only",
+            "--cap-drop=ALL",
+            "--security-opt=no-new-privileges",
+            "--mount",
+            f"type=bind,src={prepared / 'repo'},dst=/repo,readonly",
+            "--tmpfs",
+            "/tmp:rw,nosuid,size=64m",
+        ],
+        "container_timeout": f"{args.wall_seconds + 300}s",
+    }
+    dump(
+        out / "manifest.json",
+        {
+            "benchmark": "SWE-Explore",
+            "task": task,
+            "preparation": prep,
+            "prepared_dir": str(prepared),
+            "model": bench.MODEL_NAMES[args.model],
+            "top_k_regions": args.top_k,
+            "steps": args.steps,
+            "output_tokens_per_call": args.output_tokens,
+            "image": image,
+            "wall_time_limit_seconds": args.wall_seconds,
+            "policy": "read-only repository; no container network; submitted ranked regions",
+        },
+    )
     print("Run directory:", out, flush=True)
     env = agent = None
     start = time.monotonic()
@@ -216,15 +322,30 @@ def run(args):
         info = agent.run(task["problem_statement"], top_k=args.top_k)
         (out / "submission.txt").write_text(info.get("submission") or "")
         if info.get("exit_status") == "Submitted":
-            regions = parse_regions(info["submission"], line_counts(prepared / "repo"), args.top_k)
-            dump(out / "regions.json", [dict(zip(("path", "start", "end"), r)) for r in regions])
+            regions = parse_regions(
+                info["submission"], line_counts(prepared / "repo"), args.top_k
+            )
+            dump(
+                out / "regions.json",
+                [dict(zip(("path", "start", "end"), r)) for r in regions],
+            )
         else:
             print("No valid submission:", info.get("exit_status"))
     finally:
         if agent is not None:
-            trajectory = agent.save(out / "trajectory.traj.json", {"info": info, "instance_id": task["instance_id"]})
-            dump(out / "metrics.json", {**bench.metrics(trajectory), "exit_status": info.get("exit_status"),
-                 "wall_seconds": time.monotonic() - start, "valid_regions_saved": (out / "regions.json").exists()})
+            trajectory = agent.save(
+                out / "trajectory.traj.json",
+                {"info": info, "instance_id": task["instance_id"]},
+            )
+            dump(
+                out / "metrics.json",
+                {
+                    **bench.metrics(trajectory),
+                    "exit_status": info.get("exit_status"),
+                    "wall_seconds": time.monotonic() - start,
+                    "valid_regions_saved": (out / "regions.json").exists(),
+                },
+            )
         if env is not None:
             env.cleanup()
     return 0 if (out / "regions.json").exists() else 1
@@ -238,19 +359,33 @@ def score(args):
     if digest(grading) != manifest["preparation"]["grading_sha256"]:
         raise SystemExit("Grading record changed; refusing to score.")
     evaluator_file = Path(args.evaluator_source).expanduser().absolute() / "eval.py"
-    spec = importlib.util.spec_from_file_location("swe_explore_official_evaluator", evaluator_file)
+    spec = importlib.util.spec_from_file_location(
+        "swe_explore_official_evaluator", evaluator_file
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     iid = manifest["task"]["instance_id"]
     regions = json.loads((run_dir / "regions.json").read_text())
     counts = line_counts(prepared / "repo")
     # Revalidate persisted predictions before passing them to the scorer.
-    submission = "RELEVANT_FILES:\n" + "\n".join(f"- {r['path']}:{r['start']}-{r['end']}" for r in regions)
+    submission = "RELEVANT_FILES:\n" + "\n".join(
+        f"- {r['path']}:{r['start']}-{r['end']}" for r in regions
+    )
     predictions = parse_regions(submission, counts, manifest["top_k_regions"])
-    evaluator = module.ExploreEvaluator(bench_data_path=grading, file_line_counts={iid: counts})
-    scores = evaluator.evaluate(explore_method=lambda issue, instance: predictions, instance_ids=[iid], metrics=METRICS)
-    result = {"instance_id": iid, "scores": scores[iid], "evaluator_file_sha256": digest(evaluator_file),
-              "scored_artifact": "submitted ranked regions; not all observed reads"}
+    evaluator = module.ExploreEvaluator(
+        bench_data_path=grading, file_line_counts={iid: counts}
+    )
+    scores = evaluator.evaluate(
+        explore_method=lambda issue, instance: predictions,
+        instance_ids=[iid],
+        metrics=METRICS,
+    )
+    result = {
+        "instance_id": iid,
+        "scores": scores[iid],
+        "evaluator_file_sha256": digest(evaluator_file),
+        "scored_artifact": "submitted ranked regions; not all observed reads",
+    }
     dump(run_dir / "scores.json", result)
     print(json.dumps(result, indent=2))
     return 0
@@ -260,7 +395,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("prepare")
-    p.add_argument("--bench", required=True, help="Existing normalized SWE-Explore JSONL")
+    p.add_argument(
+        "--bench", required=True, help="Existing normalized SWE-Explore JSONL"
+    )
     p.add_argument("--instance", default=INSTANCE)
     p.add_argument("--output", default="explore-input/xarray-4629")
     p.add_argument("--task-dataset", default="princeton-nlp/SWE-bench_Verified")

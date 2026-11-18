@@ -1,8 +1,6 @@
-"""Load an existing prepared SWE-Explore dir into a PreparedTask + BM25 builder.
+"""Load an existing prepared dir into a PreparedTask + BM25 builder.
 
-Reuses the oracle explore.py prepare output layout (explore-input/<id>/ with repo/,
-task.json, benchmark.grading.jsonl, preparation.json) so we don't re-download. The
-BM25 builder wraps the E2 payload and the Option-B serializer for the coordinator.
+BM25 builder wraps the payload and the serializer for the coordinator.
 """
 
 from __future__ import annotations
@@ -33,8 +31,9 @@ def load_prepared(prepared_dir, *, top_k: int = 5) -> PreparedTask:
 
 
 def bm25_build_index(repo_dir, serialized_out) -> dict:
-    """Coordinator build_index hook: build BM25 on the host, serialize for Option B."""
+    """Coordinator build_index hook: build BM25 on the host, serialize it"""
     from indextool.bm25 import BM25Payload
+
     from .index_serialize import serialize_bm25
 
     payload = BM25Payload()

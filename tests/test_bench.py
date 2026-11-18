@@ -1,26 +1,45 @@
 import argparse
 import csv
 import importlib.util
-import json
-from pathlib import Path
 import sys
 import tempfile
 import types
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-spec = importlib.util.spec_from_file_location("bench", Path(__file__).parents[1] / "oracle" / "bench.py")
+spec = importlib.util.spec_from_file_location(
+    "bench", Path(__file__).parents[1] / "oracle" / "bench.py"
+)
 bench = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bench)
 
 
 class Measurements(unittest.TestCase):
     def test_usage_counts_format_failures_once(self):
-        trajectory = {"messages": [
-            {"role": "assistant", "extra": {"response": {"usage": {"prompt_tokens": 12, "completion_tokens": 4}}, "actions": [{"command": "ls"}]}},
-            {"role": "user", "extra": {"interrupt_type": "FormatError", "response": {"usage": {"prompt_tokens": 20, "completion_tokens": 6}}}},
-            {"role": "user", "content": "tool observation"},
-        ]}
+        trajectory = {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "extra": {
+                        "response": {
+                            "usage": {"prompt_tokens": 12, "completion_tokens": 4}
+                        },
+                        "actions": [{"command": "ls"}],
+                    },
+                },
+                {
+                    "role": "user",
+                    "extra": {
+                        "interrupt_type": "FormatError",
+                        "response": {
+                            "usage": {"prompt_tokens": 20, "completion_tokens": 6}
+                        },
+                    },
+                },
+                {"role": "user", "content": "tool observation"},
+            ]
+        }
         m = bench.metrics(trajectory)
         self.assertEqual(m["input_tokens_recorded"], 32)
         self.assertEqual(m["output_tokens_recorded"], 10)
@@ -41,6 +60,7 @@ class Measurements(unittest.TestCase):
     def test_selection_preserves_order_and_revision(self):
         class Dataset(list):
             _fingerprint = "frozen-test-fingerprint"
+
         dataset = Dataset([{"instance_id": "b"}, {"instance_id": "a"}])
         mod = types.ModuleType("datasets")
         mod.load_dataset = unittest.mock.Mock(return_value=dataset)
@@ -49,7 +69,9 @@ class Measurements(unittest.TestCase):
             rows, fp = bench.select_tasks(args)
             self.assertEqual([r["instance_id"] for r in rows], ["a", "b"])
             self.assertEqual(fp, dataset._fingerprint)
-            self.assertEqual(mod.load_dataset.call_args.kwargs["revision"], "revision-sha")
+            self.assertEqual(
+                mod.load_dataset.call_args.kwargs["revision"], "revision-sha"
+            )
             args.instances = "missing"
             with self.assertRaises(SystemExit):
                 bench.select_tasks(args)
@@ -60,7 +82,9 @@ class Measurements(unittest.TestCase):
             task = root / "example__repo-1"
             task.mkdir()
             bench.dump(task / "task.json", {"instance_id": task.name})
-            bench.dump(task / "process.json", {"status": "wall_timeout", "wall_seconds": 100})
+            bench.dump(
+                task / "process.json", {"status": "wall_timeout", "wall_seconds": 100}
+            )
             bench.summarize(argparse.Namespace(run_dir=tmp))
             with (root / "summary.csv").open() as f:
                 rows = list(csv.DictReader(f))
@@ -72,7 +96,11 @@ class Measurements(unittest.TestCase):
             root = Path(tmp)
             bench.dump(root / "predictions.json", [])
             args = argparse.Namespace(run_dir=tmp, evaluator_python=sys.executable)
-            with patch.object(bench.subprocess, "run", return_value=types.SimpleNamespace(returncode=0)) as mock:
+            with patch.object(
+                bench.subprocess,
+                "run",
+                return_value=types.SimpleNamespace(returncode=0),
+            ) as mock:
                 bench.evaluate(args)
                 first = mock.call_args.args[0]
                 bench.evaluate(args)

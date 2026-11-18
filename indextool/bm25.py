@@ -1,10 +1,10 @@
-"""BM25 index payload (E2-S2).
+"""BM25 index payload.
 
 Concrete IndexPayload. `rank_bm25` is imported lazily so the rest of indextool
-(and its tests) work without it; constructing a BM25Payload without the dependency
+(and its tests) work without it, constructing a BM25Payload without the dependency
 raises a clear error, and tests skip accordingly.
 
-Leakage guard (tool_policy §6): only agent-visible source under repo_root is
+Only agent-visible source under repo_root is
 chunked, and we assert no grading/gold/held-out artifacts slipped in.
 """
 
@@ -17,7 +17,7 @@ from pathlib import Path
 from .chunking import chunk_repo
 from .contract import BuildInfo, Region
 
-# Builder provenance: bump when the build logic changes (R9).
+# Builder provenance: bump when the build logic changes.
 BUILDER_SOURCE_SHA = "indextool.bm25.v1"
 
 # Paths that must never enter the index (gold labels / held-out tests).
@@ -41,8 +41,14 @@ def _require_rank_bm25():
 class BM25Payload:
     kind = "bm25"
 
-    def __init__(self, *, chunk_size: int = 80, chunk_overlap: int = 20,
-                 max_chunks: int = 3000, max_snippet_bytes: int = 2048) -> None:
+    def __init__(
+        self,
+        *,
+        chunk_size: int = 80,
+        chunk_overlap: int = 20,
+        max_chunks: int = 3000,
+        max_snippet_bytes: int = 2048,
+    ) -> None:
         self._BM25Okapi = _require_rank_bm25()
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -91,8 +97,13 @@ class BM25Payload:
                 "utf-8", errors="ignore"
             )
             regions.append(
-                Region(path=chunk.path, start=chunk.start, end=chunk.end,
-                       score=float(score), snippet=snippet)
+                Region(
+                    path=chunk.path,
+                    start=chunk.start,
+                    end=chunk.end,
+                    score=float(score),
+                    snippet=snippet,
+                )
             )
         return regions
 
@@ -101,7 +112,9 @@ class BM25Payload:
         for c in chunks:
             low = c.path.lower()
             if any(m in low for m in _LEAKAGE_MARKERS):
-                raise RuntimeError(f"leakage: grading artifact entered the index: {c.path}")
+                raise RuntimeError(
+                    f"leakage: grading artifact entered the index: {c.path}"
+                )
         return True
 
 

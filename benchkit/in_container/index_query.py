@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""In-container `index_query` CLI (Option B).
+"""In-container `index_query` CLI.
 
 Pure stdlib. Mounted read-only into the locked-down container next to a serialized
 BM25 index. The agent calls:
@@ -9,12 +9,12 @@ BM25 index. The agent calls:
 It scores chunks against the serialized index, reads snippet text from the mounted
 read-only /repo, truncates to the snippet byte cap, and prints the same format the
 host-side ToolBoundary renders. The host reconstructs ToolCallRecords from the
-trajectory afterward (R7); this script itself has no host callback and no network.
+trajectory afterward; this script itself has no host callback and no network.
 
 Environment (set by the container spec):
     INDEX_FILE          path to serialized index JSON (read-only mount)
     INDEX_REPO          path to the read-only repo root (default /repo)
-    INDEX_MAX_TOP_K     policy top_k limit (clamp)
+    INDEX_MAX_TOP_K     policy top_k limit
     INDEX_MAX_SNIPPET   snippet byte cap
 """
 
@@ -22,7 +22,6 @@ import argparse
 import json
 import math
 import os
-import sys
 from pathlib import Path
 
 
@@ -50,8 +49,10 @@ def score(index, query_tokens):
             tf = ch["tf"].get(term)
             if not tf:
                 continue
-            s += _idf(df.get(term, 0), n) * (tf * (k1 + 1)) / (
-                tf + k1 * (1 - b + b * dl / avgdl)
+            s += (
+                _idf(df.get(term, 0), n)
+                * (tf * (k1 + 1))
+                / (tf + k1 * (1 - b + b * dl / avgdl))
             )
         if s > 0:
             results.append((i, s))
@@ -65,7 +66,7 @@ def read_snippet(repo_root, path, start, end, max_bytes):
         lines = f.read_text(errors="ignore").splitlines()
     except OSError:
         return ""
-    chunk = "\n".join(lines[start - 1:end])
+    chunk = "\n".join(lines[start - 1 : end])
     return chunk.encode("utf-8")[:max_bytes].decode("utf-8", errors="ignore")
 
 
@@ -98,7 +99,9 @@ def main(argv=None):
     for rank, (i, s) in enumerate(ranked, 1):
         ch = index["chunks"][i]
         print(f"[{rank}] {ch['path']}:{ch['start']}-{ch['end']}  (score={s:.4f})")
-        snippet = read_snippet(repo_root, ch["path"], ch["start"], ch["end"], max_snippet)
+        snippet = read_snippet(
+            repo_root, ch["path"], ch["start"], ch["end"], max_snippet
+        )
         if snippet:
             print(snippet)
     return 0

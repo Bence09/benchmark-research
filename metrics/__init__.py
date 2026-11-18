@@ -1,9 +1,8 @@
-"""metrics (E4): cost/outcome measurement, Prometheus-style.
+"""metrics: cost/outcome measurement, Prometheus-style.
 
-Pure, offline, post-hoc over artifacts mini already writes (never forks mini,
-per PIPELINE.md). Defines metrics cleanly (named, labeled, base units, explicit
-null for unknown) so a Prometheus/Grafana-style stack can consume them later;
-plotting is out of scope here (optional convenience only).
+Pure, offline, post-hoc over artifacts mini already writes.
+Defines metrics (named, labeled, base units, explicit
+null for unknown) so a Prometheus/Grafana-style stack can consume them later.
 
 - read_metrics(trajectory): per-channel delivered read volume (search/read/index/
   other/unattributed), first-program classification, null-safe.
@@ -12,12 +11,17 @@ plotting is out of scope here (optional convenience only).
 - to_prometheus(rows): text-exposition format.
 """
 
-from .read_metrics import read_metrics, classify_command, Channel
-from .failures import classify_failure, FailureCategory
-from .join import join_runs, to_prometheus, to_csv
+from .failures import FailureCategory, classify_failure
+from .join import join_runs, to_csv, to_prometheus
+from .read_metrics import Channel, classify_command, read_metrics
 
 __all__ = [
-    "read_metrics", "classify_command", "Channel",
-    "classify_failure", "FailureCategory",
-    "join_runs", "to_prometheus", "to_csv",
+    "Channel",
+    "FailureCategory",
+    "classify_command",
+    "classify_failure",
+    "join_runs",
+    "read_metrics",
+    "to_csv",
+    "to_prometheus",
 ]
