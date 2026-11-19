@@ -99,6 +99,11 @@ def _append_index_mounts(env, serialized_index: Path) -> None:
     Lockdown flags are untouched, we only add read-only mounts and env vars.
     """
     cli = IN_CONTAINER_DIR / "index_query.py"
+    # Both files are mounted read-only into a --cap-drop=ALL container (no
+    # DAC_OVERRIDE), so root inside can only read them if world-readable. index.json
+    # is chmod'd by the serializer; ensure the CLI is too (a fresh git checkout may
+    # not be world-readable, and /mnt/c's 0777 masks this locally).
+    os.chmod(cli, 0o644)
     # Mount the serialized index dir and the CLI, both read-only.
     env.run_args += [
         "--mount",
@@ -267,6 +272,10 @@ def _write_shim_bootstrap_into(index_env: dict, shim_path: str) -> None:
     with tempfile.NamedTemporaryFile("w", suffix=".index_shim", delete=False) as fd:
         fd.write(bootstrap)
         shim_file = fd.name
+    # NamedTemporaryFile creates 0600 files owned by the host user. The container
+    # runs with --cap-drop=ALL (no DAC_OVERRIDE), so root inside cannot read it
+    # unless it is world-readable.
+    os.chmod(shim_file, 0o644)
     index_env["run_args"] += [
         "--mount",
         f"type=bind,src={shim_file},dst={shim_path},readonly",

@@ -57,6 +57,13 @@ def serialize_bm25(payload, build_info, out_path: Path) -> dict:
     }
     out_path = Path(out_path)
     out_path.write_text(json.dumps(index, ensure_ascii=False))
+    # Mounted read-only into a --cap-drop=ALL container (no DAC_OVERRIDE), so root
+    # inside can only read it if it is world-readable. The host umask may produce
+    # 0600/0640 on a normal filesystem (it only looked fine on /mnt/c, which forces
+    # 0777). Make it world-readable explicitly, like the index_query shim.
+    import os as _os
+
+    _os.chmod(out_path, 0o644)
     return {
         **build_info.to_dict(),
         "serialized_path": out_path.name,
