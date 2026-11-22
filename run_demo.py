@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example demo runner for the tool-policy framework.
 
-Illustrates the intended framework usage: pick a benchmark, pick a condition, run.
+Shows the intended framework usage: pick a benchmark, pick a condition, run.
 The benchmark is a parameter (--benchmark); everything else (policy resolution,
 index build, execution, scoring, metrics join) is benchmark-agnostic. Needs Docker
 running and OPENAI_API_KEY set in the shell.
@@ -69,7 +69,7 @@ def _load_swebench_prepared(out: Path):
     return PreparedTask(
         instance_id=task["instance_id"],
         prepared_dir=out,
-        repo_dir=out,
+        repo_dir=out / "repo",  # clean source snapshot
         grading_path=out / "selected-task.grading.json",
         task=task,
         preparation=prep,
@@ -143,6 +143,17 @@ def _run_one(condition, args, prepared):
 def cmd_run(args):
     prepared = BENCHMARKS[args.benchmark]["prepare"](args)
     out = _run_one(args.condition, args, prepared)
+    # Score so the pool row carries a native_score, then append the
+    # run to the shared sweep pool - devery run, single or demo, lands in one CSV.
+    try:
+        _score_run(out, args, prepared)
+    except Exception as exc:  # noqa: BLE001 - scoring failure must not drop the run from the pool
+        print(f"  (scoring skipped for {Path(out).name}: {exc})")
+    sweep_root = (
+        Path(args.runs_root).expanduser() if args.runs_root else (ROOT / "runs")
+    )
+    _emit([out], sweep_root / "sweep",
+          sweep_id=getattr(args, "sweep_id", None), append=True)
     print("Done:", out)
     return 0
 
@@ -278,6 +289,8 @@ def main():
 
     r = sub.add_parser("run", help="run a single condition")
     r.add_argument("--condition", default="baseline")
+    r.add_argument("--sweep-id", default=None,
+                   help="grouping label for this run's pool row (default: auto)")
     common(r)
     r.set_defaults(func=cmd_run)
 

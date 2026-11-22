@@ -70,8 +70,11 @@ def row_from_run(
         "instance": (manifest or {}).get("instance_id")
         or (manifest or {}).get("task", {}).get("instance_id"),
         "failure_category": failure.value,
-        # outcome
+        # outcome -- kept as separate per-benchmark columns, never merged into one
+        # "score": SWE-Explore populates native_score (f1), SWE-bench populates
+        # resolved (bool). The other stays null (honest, not zero).
         "native_score": native_score,
+        "resolved": resolved,
         # cost: tokens
         "input_tokens": (metrics or {}).get("input_tokens_recorded"),
         "output_tokens": (metrics or {}).get("output_tokens_recorded"),
@@ -116,6 +119,7 @@ _LEAD_COLS = [
     "instance",
     "failure_category",
     "native_score",
+    "resolved",
 ]
 
 
@@ -217,6 +221,13 @@ def to_prometheus(rows: list[dict]) -> str:
             r.get("native_score"),
             base,
             "Native benchmark score (outcome).",
+        )
+        _resolved = r.get("resolved")
+        emit(
+            "resolved",
+            (1 if _resolved else 0) if _resolved is not None else None,
+            base,
+            "SWE-bench hidden-test outcome (1 resolved, 0 not).",
         )
         emit(
             "input_tokens",

@@ -125,10 +125,17 @@ class TestCoordinatorPlanning(unittest.TestCase):
             build_index=fake_builder,
         )
         self.assertIsNotNone(plan.index_provenance)
-        self.assertTrue(any(m["dst"] == "/index/index.json" for m in plan.env.mounts))
-        self.assertTrue(
-            any(m["dst"].endswith("index_query.py") for m in plan.env.mounts)
-        )
+        # Index wiring now flows through index_spec -> _build_index_env (the channel
+        # every adapter's make_environment honors), NOT EnvSpec.run_args (which
+        # SWE-bench's get_sb_environment ignores).
+        self.assertIsNotNone(plan.index_spec)
+        from benchkit.coordinator import _build_index_env
+        ie = {"env": {}, "run_args": []}
+        _build_index_env(ie, plan.index_spec, plan.env.cwd)
+        ra = " ".join(ie["run_args"])
+        self.assertIn("/index/index.json,readonly", ra)
+        self.assertIn("index_query.py,readonly", ra)
+        self.assertEqual(ie["env"]["INDEX_REPO"], plan.env.cwd)
         # prompt now describes the added tool (intervention is explicit)
         self.assertIn("index_query", plan.prompt.system_template)
 
@@ -143,6 +150,7 @@ class TestCoordinatorPlanning(unittest.TestCase):
             "baseline_plus_index",
             build_index=fake_builder,
         )
+        # Lockdown flags live on the adapter's EnvSpec and are untouched by index wiring.
         joined = " ".join(plan.env.run_args)
         for flag in (
             "--network=none",
@@ -151,8 +159,11 @@ class TestCoordinatorPlanning(unittest.TestCase):
             "--security-opt=no-new-privileges",
         ):
             self.assertIn(flag, joined)
-        # every index mount is read-only
-        self.assertEqual(joined.count("dst=/index/index.json,readonly"), 1)
+        # index mount is added through index_env, read-only, exactly once.
+        from benchkit.coordinator import _build_index_env
+        ie = {"env": {}, "run_args": []}
+        _build_index_env(ie, plan.index_spec, plan.env.cwd)
+        self.assertEqual(" ".join(ie["run_args"]).count("dst=/index/index.json,readonly"), 1)
 
 
 # --- Option B round trip: host serialize -> in-container CLI ---

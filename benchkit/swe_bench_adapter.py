@@ -7,7 +7,7 @@ grading runs the official hidden tests via the pinned harness (swebench 2.1.7 in
   - evaluate() shells out to swebench.harness.run_evaluation
   - gold fields (patch/test_patch/FAIL_TO_PASS) stay host-only, never in task.json.
 
-Note: the index is built at prepare time and is read-only,
+NOTE: the index is built at prepare time and is read-only,
 a fixing-agent edits files, so the index can go stale mid-run. First cut treats the
 index as pre-edit "find the bug" only, churn/staleness deferred.
 """
@@ -169,6 +169,14 @@ class SweBenchAdapter:
                 task[opt] = row[opt]
         (out / "task.json").write_text(json.dumps(task, indent=2) + "\n")
 
+        # Download the base-commit source snapshot into a clean repo/ subdir.
+        # The agent still runs against the image's /testbed, this host snapshot
+        # exists only so the index can be built over real source with no grading in
+        # the indexed tree (grading stays in out/, outside repo/).
+        from .prepare_support import download_repo_snapshot
+
+        snap = download_repo_snapshot(row["repo"], row["base_commit"], out / "repo")
+
         import hashlib
 
         prep = {
@@ -177,6 +185,10 @@ class SweBenchAdapter:
             "split": SPLIT,
             "dataset_revision": spec.get("dataset_revision", "main"),
             "dataset_fingerprint": ds._fingerprint,
+            "repo": row["repo"],
+            "base_commit": row["base_commit"],
+            "archive_sha256": snap["archive_sha256"],
+            "skipped_symlinks": snap["skipped_symlinks"],
             "grading_sha256": hashlib.sha256(
                 (out / "selected-task.grading.json").read_bytes()
             ).hexdigest(),
@@ -186,7 +198,7 @@ class SweBenchAdapter:
         return PreparedTask(
             instance_id=instance_id,
             prepared_dir=out,
-            repo_dir=out,  # repo lives in image
+            repo_dir=out / "repo",  # clean source snapshot (no grading); index builds here
             grading_path=out / "selected-task.grading.json",
             task=task,
             preparation=prep,

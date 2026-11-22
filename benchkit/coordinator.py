@@ -30,6 +30,7 @@ class RunPlan:
     index_provenance: dict | None
     manifest: dict
     summary: str
+    index_spec: dict | None = None  # {serialized, limits} when policy adds index_query
 
 
 def plan_run(
@@ -54,6 +55,7 @@ def plan_run(
     env = adapter.container_spec(prepared, effective)
 
     index_provenance = None
+    index_spec = None
     if _policy_adds_index(effective):
         if build_index is None:
             raise RuntimeError(
@@ -61,11 +63,13 @@ def plan_run(
             )
         serialized = Path(prepared.prepared_dir) / "index.json"
         index_provenance = build_index(prepared.repo_dir, serialized)
-        # Pass the resolved policy's index limits so the in-container tool actually
-        # enforces them (recorded limits must also be applied, not just logged).
+        # Carry the serialized index path + the resolved policy's index limits so
+        # execute() can wire them into index_env.
+        # NOTE: do not append to EnvSpec.run_args -- SWE-bench builds its container via
+        # get_sb_environment and ignores EnvSpec.run_args, which stranded the mounts.
         idx_tool = next((t for t in effective.get("tools", [])
                          if t.get("name") == "index_query"), {})
-        _append_index_mounts(env, serialized, idx_tool.get("limits") or {})
+        index_spec = {"serialized": str(serialized), "limits": idx_tool.get("limits") or {}}
 
     manifest = {
         "benchmark": adapter.name,
@@ -78,7 +82,7 @@ def plan_run(
         "mounts": env.mounts,
         "image": env.image,
     }
-    return RunPlan(
+    plan = RunPlan(
         adapter_name=adapter.name,
         condition=condition,
         effective_policy=effective,
@@ -88,6 +92,8 @@ def plan_run(
         manifest=manifest,
         summary=render_summary(effective),
     )
+    plan.index_spec = index_spec
+    return plan
 
 
 def _policy_adds_index(effective: dict) -> bool:
@@ -97,44 +103,41 @@ def _policy_adds_index(effective: dict) -> bool:
     )
 
 
-def _append_index_mounts(env, serialized_index: Path, limits: dict | None = None) -> None:
-    """Add the read-only index artifact + the pure-Python CLI to the container.
+def _build_index_env(index_env: dict, index_spec: dict, repo_in_container: str) -> None:
+    """Populate index_env with everything the in-container index tool needs.
 
-    Lockdown flags are untouched, we only add read-only mounts and env vars.
-    `limits` (from the resolved policy's index_query tool) are passed into the
-    container so the tool ENFORCES them (top_k cap, snippet byte cap), not just
-    records them -- otherwise the CLI falls back to its own defaults (top_k 10).
+    Writes into index_env (run_args + env), the single channel every adapter's
+    make_environment merges. Mounts the serialized index read-only,
+    defines the index_query shell shim via BASH_ENV,
+    sets INDEX_REPO to the container's actual repo path, and
+    passes the policy limits so the tool enforces them.
     """
-    limits = limits or {}
+    from pathlib import Path as _Path
+
+    serialized = _Path(index_spec["serialized"])
+    limits = index_spec.get("limits") or {}
     cli = IN_CONTAINER_DIR / "index_query.py"
-    # Both files are mounted read-only into a --cap-drop=ALL container (no
-    # DAC_OVERRIDE), so root inside can only read them if world-readable. index.json
-    # is chmod'd by the serializer; ensure the CLI is too (a fresh git checkout may
-    # not be world-readable, and /mnt/c's 0777 masks this locally).
+    # Read-only mounts into a --cap-drop=ALL container require world-readable files.
     os.chmod(cli, 0o644)
-    # Mount the serialized index dir and the CLI, both read-only.
-    env.run_args += [
+
+    shim = "/tmp/.index_shim"
+    _write_shim_bootstrap_into(index_env, shim)
+
+    index_env["run_args"] += [
         "--mount",
-        f"type=bind,src={serialized_index},dst={INDEX_MOUNT_DST}/index.json,readonly",
+        f"type=bind,src={serialized},dst={INDEX_MOUNT_DST}/index.json,readonly",
         "--mount",
         f"type=bind,src={cli},dst={INDEX_TOOL_DST},readonly",
-        "--env",
-        f"INDEX_FILE={INDEX_MOUNT_DST}/index.json",
-        "--env",
-        "INDEX_REPO=/repo",
     ]
+    index_env["env"].update({
+        "BASH_ENV": shim,
+        "INDEX_FILE": f"{INDEX_MOUNT_DST}/index.json",
+        "INDEX_REPO": repo_in_container,
+    })
     if "top_k" in limits:
-        env.run_args += ["--env", f"INDEX_MAX_TOP_K={int(limits['top_k'])}"]
+        index_env["env"]["INDEX_MAX_TOP_K"] = str(int(limits["top_k"]))
     if "max_snippet_bytes" in limits:
-        env.run_args += ["--env", f"INDEX_MAX_SNIPPET={int(limits['max_snippet_bytes'])}"]
-    env.mounts += [
-        {
-            "src": str(serialized_index),
-            "dst": f"{INDEX_MOUNT_DST}/index.json",
-            "readonly": True,
-        },
-        {"src": str(cli), "dst": INDEX_TOOL_DST, "readonly": True},
-    ]
+        index_env["env"]["INDEX_MAX_SNIPPET"] = str(int(limits["max_snippet_bytes"]))
 
 
 class Coordinator:
@@ -206,14 +209,14 @@ class Coordinator:
             wall_time_limit_seconds=wall_seconds,
         )
 
-        # Index wiring is benchmark-agnostic, when the policy adds index_query, the
-        # coordinator prepares the BASH_ENV shim; the adapter merges index_env into
-        # whatever environment it builds.
+        # Everything the index tool needs goes
+        # into index_env, which the adapter's make_environment merges into whatever
+        # container it builds.
         index_env = {"env": {}, "run_args": []}
-        if _policy_adds_index(plan.effective_policy):
-            shim = "/tmp/.index_shim"
-            index_env["env"]["BASH_ENV"] = shim
-            _write_shim_bootstrap_into(index_env, shim)
+        if _policy_adds_index(plan.effective_policy) and plan.index_spec:
+            # repo path differs per benchmark: /repo (Explore) vs /testbed (SWE-bench).
+            repo_in_container = getattr(plan.env, "cwd", "/repo")
+            _build_index_env(index_env, plan.index_spec, repo_in_container)
 
         # The adapter owns environment construction.
         env, env_manifest = self.adapter.make_environment(

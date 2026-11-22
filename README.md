@@ -163,6 +163,21 @@ environment. SWE-Explore uses the pinned upstream region scorer in
 read the official report; the framework records `resolved: null` when no report is
 produced rather than inventing a pass.
 
+**Grading needs a Docker daemon the Python Docker SDK can reach.** The SWE-bench
+harness calls `docker.from_env()`, which talks to a daemon over a socket — not the
+`docker` CLI. On Podman-rootless the CLI works (so agent *runs* are fine) but the SDK
+has no socket by default, so **grading** fails with
+`DockerException: ... PermissionError(13, 'Permission denied')` and you get
+`resolved: null`. This is an environment setup step, not something the framework
+handles. If you see that error, expose the Podman API socket and point the SDK at it:
+
+```bash
+systemctl --user enable --now podman.socket
+export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock
+```
+
+Then re-run the `score` step. With real Docker Desktop/daemon this is already satisfied.
+
 ## Tool policy and the index tool
 
 Conditions are declared in `conditions/config.yaml`, additively: a baseline names the
