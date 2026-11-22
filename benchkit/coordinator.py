@@ -61,7 +61,11 @@ def plan_run(
             )
         serialized = Path(prepared.prepared_dir) / "index.json"
         index_provenance = build_index(prepared.repo_dir, serialized)
-        _append_index_mounts(env, serialized)
+        # Pass the resolved policy's index limits so the in-container tool actually
+        # enforces them (recorded limits must also be applied, not just logged).
+        idx_tool = next((t for t in effective.get("tools", [])
+                         if t.get("name") == "index_query"), {})
+        _append_index_mounts(env, serialized, idx_tool.get("limits") or {})
 
     manifest = {
         "benchmark": adapter.name,
@@ -93,11 +97,15 @@ def _policy_adds_index(effective: dict) -> bool:
     )
 
 
-def _append_index_mounts(env, serialized_index: Path) -> None:
+def _append_index_mounts(env, serialized_index: Path, limits: dict | None = None) -> None:
     """Add the read-only index artifact + the pure-Python CLI to the container.
 
     Lockdown flags are untouched, we only add read-only mounts and env vars.
+    `limits` (from the resolved policy's index_query tool) are passed into the
+    container so the tool ENFORCES them (top_k cap, snippet byte cap), not just
+    records them -- otherwise the CLI falls back to its own defaults (top_k 10).
     """
+    limits = limits or {}
     cli = IN_CONTAINER_DIR / "index_query.py"
     # Both files are mounted read-only into a --cap-drop=ALL container (no
     # DAC_OVERRIDE), so root inside can only read them if world-readable. index.json
@@ -115,6 +123,10 @@ def _append_index_mounts(env, serialized_index: Path) -> None:
         "--env",
         "INDEX_REPO=/repo",
     ]
+    if "top_k" in limits:
+        env.run_args += ["--env", f"INDEX_MAX_TOP_K={int(limits['top_k'])}"]
+    if "max_snippet_bytes" in limits:
+        env.run_args += ["--env", f"INDEX_MAX_SNIPPET={int(limits['max_snippet_bytes'])}"]
     env.mounts += [
         {
             "src": str(serialized_index),

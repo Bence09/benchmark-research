@@ -28,6 +28,15 @@ _defs:
     limits: { top_k: 10, max_snippet_bytes: 2048, timeout_seconds: 30 }
     result_shape: pointers_plus_snippet
     description_style: encouraged
+  # Same as encouraged but returns far fewer regions per call (top_k 3), to test
+  # whether the precision benefit survives with much less delivered snippet volume
+  # (the k=10 config delivered ~678 lines over 2 calls on django-14792).
+  index_encouraged_k3: &index_encouraged_k3
+    directive: add
+    payload: { kind: bm25, index_ref: null, stale: false }
+    limits: { top_k: 3, max_snippet_bytes: 2048, timeout_seconds: 30 }
+    result_shape: pointers_plus_snippet
+    description_style: encouraged
 
 conditions:
   # --- SWE-Explore localization floor: grep + read + submit ---
@@ -50,6 +59,12 @@ conditions:
     description: "Same index tool, prompt encourages trying it first (recorded nudge)."
     tools:
       index_query: *index_encouraged
+
+  baseline_plus_index_encouraged_k3:
+    extends: baseline_plus_index
+    description: "Encouraged index returning only top-3 regions per call (lower delivered cost)."
+    tools:
+      index_query: *index_encouraged_k3
 
   # --- SWE-bench repair floor: adds edit + run (agent edits + runs tests) ---
   swebench_baseline:
