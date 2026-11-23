@@ -152,8 +152,12 @@ def cmd_run(args):
     sweep_root = (
         Path(args.runs_root).expanduser() if args.runs_root else (ROOT / "runs")
     )
-    _emit([out], sweep_root / "sweep",
-          sweep_id=getattr(args, "sweep_id", None), append=True)
+    _emit(
+        [out],
+        sweep_root / "sweep",
+        sweep_id=getattr(args, "sweep_id", None),
+        append=True,
+    )
     print("Done:", out)
     return 0
 
@@ -289,8 +293,11 @@ def main():
 
     r = sub.add_parser("run", help="run a single condition")
     r.add_argument("--condition", default="baseline")
-    r.add_argument("--sweep-id", default=None,
-                   help="grouping label for this run's pool row (default: auto)")
+    r.add_argument(
+        "--sweep-id",
+        default=None,
+        help="grouping label for this run's pool row (default: auto)",
+    )
     common(r)
     r.set_defaults(func=cmd_run)
 

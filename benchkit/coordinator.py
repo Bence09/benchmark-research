@@ -67,9 +67,14 @@ def plan_run(
         # execute() can wire them into index_env.
         # NOTE: do not append to EnvSpec.run_args -- SWE-bench builds its container via
         # get_sb_environment and ignores EnvSpec.run_args, which stranded the mounts.
-        idx_tool = next((t for t in effective.get("tools", [])
-                         if t.get("name") == "index_query"), {})
-        index_spec = {"serialized": str(serialized), "limits": idx_tool.get("limits") or {}}
+        idx_tool = next(
+            (t for t in effective.get("tools", []) if t.get("name") == "index_query"),
+            {},
+        )
+        index_spec = {
+            "serialized": str(serialized),
+            "limits": idx_tool.get("limits") or {},
+        }
 
     manifest = {
         "benchmark": adapter.name,
@@ -129,11 +134,13 @@ def _build_index_env(index_env: dict, index_spec: dict, repo_in_container: str) 
         "--mount",
         f"type=bind,src={cli},dst={INDEX_TOOL_DST},readonly",
     ]
-    index_env["env"].update({
-        "BASH_ENV": shim,
-        "INDEX_FILE": f"{INDEX_MOUNT_DST}/index.json",
-        "INDEX_REPO": repo_in_container,
-    })
+    index_env["env"].update(
+        {
+            "BASH_ENV": shim,
+            "INDEX_FILE": f"{INDEX_MOUNT_DST}/index.json",
+            "INDEX_REPO": repo_in_container,
+        }
+    )
     if "top_k" in limits:
         index_env["env"]["INDEX_MAX_TOP_K"] = str(int(limits["top_k"]))
     if "max_snippet_bytes" in limits:

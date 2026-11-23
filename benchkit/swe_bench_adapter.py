@@ -198,7 +198,8 @@ class SweBenchAdapter:
         return PreparedTask(
             instance_id=instance_id,
             prepared_dir=out,
-            repo_dir=out / "repo",  # clean source snapshot (no grading); index builds here
+            repo_dir=out
+            / "repo",  # clean source snapshot (no grading); index builds here
             grading_path=out / "selected-task.grading.json",
             task=task,
             preparation=prep,

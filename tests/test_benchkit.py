@@ -130,6 +130,7 @@ class TestCoordinatorPlanning(unittest.TestCase):
         # SWE-bench's get_sb_environment ignores).
         self.assertIsNotNone(plan.index_spec)
         from benchkit.coordinator import _build_index_env
+
         ie = {"env": {}, "run_args": []}
         _build_index_env(ie, plan.index_spec, plan.env.cwd)
         ra = " ".join(ie["run_args"])
@@ -161,9 +162,12 @@ class TestCoordinatorPlanning(unittest.TestCase):
             self.assertIn(flag, joined)
         # index mount is added through index_env, read-only, exactly once.
         from benchkit.coordinator import _build_index_env
+
         ie = {"env": {}, "run_args": []}
         _build_index_env(ie, plan.index_spec, plan.env.cwd)
-        self.assertEqual(" ".join(ie["run_args"]).count("dst=/index/index.json,readonly"), 1)
+        self.assertEqual(
+            " ".join(ie["run_args"]).count("dst=/index/index.json,readonly"), 1
+        )
 
 
 # --- Option B round trip: host serialize -> in-container CLI ---
