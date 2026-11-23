@@ -1,0 +1,6 @@
+This is mini-swe-agent version 2.4.6.
+Check the v2 migration guide at https://klieret.short.gy/mini-v2-migration
+Loading global config from '/home/ebensze/.config/mini-swe-agent/.env'
+minisweagent.environment: DEBUG: Starting container with command: docker run -d --name minisweagent-bf5fa9ea -w /testbed --rm docker.io/swebench/sweb.eval.x86_64.astropy_1776_astropy-12907:latest sleep  
+2h                                                                                                                                                                                                         
+minisweagent.environment: INFO: Started container minisweagent-bf5fa9ea with ID 3e55ec7a82891947d3917dae54e5033a4c43afae81015a1ef7c14d4e55ee6dfe                                                           

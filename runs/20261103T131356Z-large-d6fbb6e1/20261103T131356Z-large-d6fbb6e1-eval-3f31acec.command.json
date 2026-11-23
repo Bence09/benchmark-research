@@ -1,0 +1,15 @@
+[
+  "/usr/bin/python3.10",
+  "-m",
+  "swebench.harness.run_evaluation",
+  "--dataset_name",
+  "princeton-nlp/SWE-bench_Lite",
+  "--split",
+  "test",
+  "--predictions_path",
+  "/mnt/c/uni/research-bench-starter/runs/20261103T131356Z-large-d6fbb6e1/predictions.json",
+  "--max_workers",
+  "1",
+  "--run_id",
+  "20261103T131356Z-large-d6fbb6e1-eval-3f31acec"
+]

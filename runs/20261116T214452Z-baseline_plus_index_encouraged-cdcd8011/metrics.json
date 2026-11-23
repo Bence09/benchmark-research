@@ -1,0 +1,45 @@
+{
+  "recorded_api_responses": 5,
+  "responses_with_usage": 5,
+  "usage_complete": true,
+  "input_tokens_recorded": 25341,
+  "output_tokens_recorded": 1089,
+  "max_input_tokens_recorded": 7209,
+  "tool_actions": 8,
+  "format_errors": 0,
+  "monetary_cost": null,
+  "channels": {
+    "search": {
+      "calls": 3,
+      "bytes": 3622,
+      "lines": 50
+    },
+    "read": {
+      "calls": 4,
+      "bytes": 3445,
+      "lines": 89
+    },
+    "index": {
+      "calls": 1,
+      "bytes": 10613,
+      "lines": 300
+    },
+    "other": {
+      "calls": 0,
+      "bytes": 0,
+      "lines": 0
+    },
+    "unattributed": {
+      "calls": 0,
+      "bytes": 0,
+      "lines": 0
+    }
+  },
+  "lines_read_total": 439,
+  "bytes_read_total": 17680,
+  "unattributed_calls": 0,
+  "unattributed_bytes": 0,
+  "exit_status": "Submitted",
+  "wall_seconds": 288.5592875659986,
+  "valid_regions_saved": true
+}

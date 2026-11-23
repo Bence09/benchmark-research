@@ -1,0 +1,16 @@
+{
+  "wall_seconds": 102.72384959200099,
+  "api_calls": 1,
+  "usage": {
+    "completion_tokens": 2048,
+    "prompt_tokens": 839,
+    "total_tokens": 2887,
+    "completion_tokens_details": {
+      "reasoning_tokens": 2048
+    }
+  },
+  "finish_reason": "length",
+  "system_fingerprint": "vllm-0.28.0-pp3-37f791f6",
+  "content_present": false,
+  "monetary_cost": null
+}

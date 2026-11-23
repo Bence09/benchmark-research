@@ -1,0 +1,30 @@
+{
+  "benchmark": "RepoBench v1.1 Python completion",
+  "protocol": "chat API adaptation; no tools or agent loop",
+  "prepared_dir": "/mnt/c/uni/research-bench-starter/repobench-input/first-2k",
+  "preparation": {
+    "dataset": "tianyang/repobench_python_v1.1",
+    "requested_revision": "main",
+    "split": "cross_file_first",
+    "level": "2k",
+    "index_within_level": 0,
+    "source_row_index": 0,
+    "selection": "fixed ordinal, no answer/output filtering",
+    "repo_name": "DLYuanGod/TinyGPT-V",
+    "file_path": "minigpt4/processors/blip_processors.py",
+    "dataset_token_num": 756,
+    "context_snippets": 3,
+    "source_dir": "/mnt/c/uni/research-bench-starter/repobench-src",
+    "source_commit": "e0cfd34c9e7cd8f057efd32b9280b9719ae12a91",
+    "prompt_builder_sha256": "ec36b0ce49f4e45a09c6d1328a88c8dc13ba39bbe90c3180377e234577e5af02",
+    "extraction_source_sha256": "37176bac147b3f035586e9acf7da2c91ba7b40a536a027ba21e7e0e98edc0552",
+    "metrics_source_sha256": "8189a6d1058184d18b1acad02617f013a4be75d69088c8bde9cd72424ec2026a",
+    "prompt_sha256": "1fce20ea8c2f55ed40af1e143d1de3e530d8a156359083ef491889af7cdb41a7",
+    "reference_sha256": "60328478ad55a81ea75876eb2aa82e81b150bf3a615f4dc4218309a0563214ba",
+    "cropping": "none; full supplied context and cropped_code; demonstration limited to 2k by default"
+  },
+  "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+  "endpoint": "https://xrlab-ie318-3.tmit.bme.hu/v1",
+  "output_tokens": 2048,
+  "temperature": 0
+}

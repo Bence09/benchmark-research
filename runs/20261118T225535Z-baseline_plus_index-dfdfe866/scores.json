@@ -1,0 +1,23 @@
+{
+  "instance_id": "pydata__xarray-4629",
+  "scores": {
+    "precision": 0.6153846153846154,
+    "recall": 0.04214963119072708,
+    "f1_score": 0.07889546351084813,
+    "hit_file_rate": 0.5,
+    "noise_file_rate": 0.0,
+    "hit_region_rate": 0.25,
+    "noise_region_rate": 0.0,
+    "weighted_core_coverage": 0.014214641080312722,
+    "context_efficiency": 1.0,
+    "recall_at_100": 0.04214963119072708,
+    "recall_at_300": 0.04214963119072708,
+    "recall_at_500": 0.04214963119072708,
+    "ndcg_at_100": 1.0,
+    "ndcg_at_300": 1.0,
+    "ndcg_at_500": 1.0,
+    "first_useful_hit": 1.0
+  },
+  "evaluator_file_sha256": "feea0a7fe67b08e68c940e10887d5b4feaae0b8c58e256eb09f253e65492d745",
+  "scored_artifact": "submitted ranked regions; not all observed reads"
+}

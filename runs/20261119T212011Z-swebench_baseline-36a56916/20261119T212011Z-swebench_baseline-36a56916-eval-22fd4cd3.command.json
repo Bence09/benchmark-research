@@ -1,0 +1,15 @@
+[
+  "/mnt/c/uni/benchmark-research/.venv-eval/bin/python",
+  "-m",
+  "swebench.harness.run_evaluation",
+  "--dataset_name",
+  "princeton-nlp/SWE-bench_Lite",
+  "--split",
+  "test",
+  "--predictions_path",
+  "/mnt/c/uni/benchmark-research/runs/20261119T212011Z-swebench_baseline-36a56916/predictions.json",
+  "--max_workers",
+  "1",
+  "--run_id",
+  "20261119T212011Z-swebench_baseline-36a56916-eval-22fd4cd3"
+]

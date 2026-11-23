@@ -1,0 +1,14 @@
+{
+  "recorded_api_responses": 30,
+  "responses_with_usage": 30,
+  "usage_complete": true,
+  "input_tokens_recorded": 329945,
+  "output_tokens_recorded": 14508,
+  "max_input_tokens_recorded": 19171,
+  "tool_actions": 29,
+  "format_errors": 1,
+  "monetary_cost": null,
+  "instance_id": "astropy__astropy-12907",
+  "exit_status": "LimitsExceeded",
+  "worker_seconds": 1179.720672949
+}

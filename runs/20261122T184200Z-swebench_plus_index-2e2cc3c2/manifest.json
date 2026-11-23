@@ -1,0 +1,99 @@
+{
+  "benchmark": "SWE-bench",
+  "instance_id": "astropy__astropy-12907",
+  "condition": "swebench_plus_index",
+  "effective_policy": {
+    "condition": "swebench_plus_index",
+    "default_environment": false,
+    "tools": [
+      {
+        "name": "grep",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "read",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "edit",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "run",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "submit",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "network",
+        "directive": "deny",
+        "status": "denied",
+        "enforcement": "enforced"
+      },
+      {
+        "name": "index_query",
+        "directive": "add",
+        "status": "added",
+        "enforcement": "best-effort",
+        "payload_kind": "bm25",
+        "index_ref_sha256": null,
+        "limits": {
+          "top_k": 10,
+          "max_snippet_bytes": 2048,
+          "timeout_seconds": 30
+        },
+        "result_shape": "pointers_plus_snippet",
+        "description_style": "encouraged"
+      }
+    ],
+    "declared_sha256": "5b38b1abf06bf46d7c2157dd70ab04ce3eb11717a84920292071023ee8b4788e",
+    "resolved_sha256": "8448950b55800acd6fe9f29719380fc97a7be7a2661372c225231123683424f6"
+  },
+  "required_capabilities": [
+    "grep",
+    "read",
+    "edit",
+    "run",
+    "submit"
+  ],
+  "top_k": 5,
+  "index_provenance": {
+    "kind": "bm25",
+    "build_seconds": 14.061312945001191,
+    "index_bytes": 8367410,
+    "input_repo_sha256": "28e17e0504598ecb7db582c6fb4a443da11f9c79e0c80bc3dcbcf8a299c9bb0c",
+    "builder_source_sha": "indextool.bm25.v1",
+    "leakage_checks_passed": true,
+    "chunk_count": 3000,
+    "serialized_path": "index.json",
+    "serialized_bytes": 10315254,
+    "serializer_version": 1
+  },
+  "mounts": [
+    "--mount",
+    "type=bind,src=/tmp/tmpzqxjsc6s.index_shim,dst=/tmp/.index_shim,readonly",
+    "--mount",
+    "type=bind,src=/mnt/c/uni/benchmark-research/swebench-input/astropy__astropy-12907/index.json,dst=/index/index.json,readonly",
+    "--mount",
+    "type=bind,src=/mnt/c/uni/benchmark-research/benchkit/in_container/index_query.py,dst=/opt/index_query.py,readonly"
+  ],
+  "image": "docker.io/swebench/sweb.eval.x86_64.astropy_1776_astropy-12907:latest",
+  "cwd": "/testbed",
+  "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+  "steps": 30,
+  "output_tokens_per_call": 2048,
+  "wall_time_limit_seconds": 3600,
+  "prepared_dir": "/mnt/c/uni/benchmark-research/swebench-input/astropy__astropy-12907"
+}

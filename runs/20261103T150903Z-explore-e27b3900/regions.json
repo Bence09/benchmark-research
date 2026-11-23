@@ -1,0 +1,17 @@
+[
+  {
+    "path": "xarray/core/merge.py",
+    "start": 495,
+    "end": 526
+  },
+  {
+    "path": "xarray/core/merge.py",
+    "start": 616,
+    "end": 625
+  },
+  {
+    "path": "xarray/tests/test_merge.py",
+    "start": 66,
+    "end": 110
+  }
+]

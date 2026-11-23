@@ -1,0 +1,78 @@
+# HELP bench_native_score Native benchmark score (outcome).
+# TYPE bench_native_score gauge
+bench_native_score{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629"} 0.08678881388621021
+# HELP bench_input_tokens Recorded input tokens.
+# TYPE bench_input_tokens counter
+bench_input_tokens{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629"} 19546
+# HELP bench_output_tokens Recorded output tokens.
+# TYPE bench_output_tokens counter
+bench_output_tokens{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629"} 1368
+# HELP bench_model_calls_total Model API calls.
+# TYPE bench_model_calls_total counter
+bench_model_calls_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629"} 6
+# HELP bench_tool_actions_total Tool actions.
+# TYPE bench_tool_actions_total counter
+bench_tool_actions_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629"} 9
+# HELP bench_lines_read_total Lines delivered via read channels.
+# TYPE bench_lines_read_total counter
+bench_lines_read_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629"} 192
+# HELP bench_bytes_read_total Bytes delivered via read channels.
+# TYPE bench_bytes_read_total counter
+bench_bytes_read_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629"} 7997
+# HELP bench_unattributed_calls_total Calls with unattributed read volume.
+# TYPE bench_unattributed_calls_total counter
+bench_unattributed_calls_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629"} 0
+# HELP bench_wall_seconds End-to-end wall time.
+# TYPE bench_wall_seconds gauge
+bench_wall_seconds{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629"} 217.4341206379977
+# HELP bench_channel_calls_total Calls per channel.
+# TYPE bench_channel_calls_total counter
+bench_channel_calls_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="search"} 4
+# HELP bench_channel_lines_total Lines delivered per channel.
+# TYPE bench_channel_lines_total counter
+bench_channel_lines_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="search"} 44
+# HELP bench_channel_bytes_total Bytes delivered per channel.
+# TYPE bench_channel_bytes_total counter
+bench_channel_bytes_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="search"} 2517
+bench_channel_calls_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="read"} 5
+bench_channel_lines_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="read"} 148
+bench_channel_bytes_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="read"} 5480
+bench_channel_calls_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="index"} 0
+bench_channel_lines_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="index"} 0
+bench_channel_bytes_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="index"} 0
+bench_channel_calls_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="other"} 0
+bench_channel_lines_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="other"} 0
+bench_channel_bytes_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="other"} 0
+bench_channel_calls_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="unattributed"} 0
+bench_channel_lines_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="unattributed"} 0
+bench_channel_bytes_total{run_key="20261122T203637Z-baseline-41c45c21",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline",instance="pydata__xarray-4629",channel="unattributed"} 0
+bench_native_score{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629"} 0.12127045235803657
+bench_input_tokens{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629"} 19980
+bench_output_tokens{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629"} 1295
+bench_model_calls_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629"} 6
+bench_tool_actions_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629"} 9
+bench_lines_read_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629"} 220
+bench_bytes_read_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629"} 9011
+bench_unattributed_calls_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629"} 0
+# HELP bench_index_build_seconds Index build time (reported separately).
+# TYPE bench_index_build_seconds gauge
+bench_index_build_seconds{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629"} 2.2822476370020013
+# HELP bench_index_bytes Serialized index size.
+# TYPE bench_index_bytes gauge
+bench_index_bytes{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629"} 5177181
+bench_wall_seconds{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629"} 80.16066523999689
+bench_channel_calls_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="search"} 3
+bench_channel_lines_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="search"} 31
+bench_channel_bytes_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="search"} 1700
+bench_channel_calls_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="read"} 6
+bench_channel_lines_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="read"} 189
+bench_channel_bytes_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="read"} 7311
+bench_channel_calls_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="index"} 0
+bench_channel_lines_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="index"} 0
+bench_channel_bytes_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="index"} 0
+bench_channel_calls_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="other"} 0
+bench_channel_lines_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="other"} 0
+bench_channel_bytes_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="other"} 0
+bench_channel_calls_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="unattributed"} 0
+bench_channel_lines_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="unattributed"} 0
+bench_channel_bytes_total{run_key="20261122T204051Z-baseline_plus_index-5ab63fb0",sweep_id="sweep-20261122T204227Z",repetition="0",benchmark="SWE-Explore",condition="baseline_plus_index",instance="pydata__xarray-4629",channel="unattributed"} 0

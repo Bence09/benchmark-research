@@ -1,0 +1,13 @@
+{
+  "exact_match": 0.0,
+  "edit_similarity_0_to_100": 84.0,
+  "codebleu": null,
+  "codebleu_status": "not computed in this demonstration",
+  "prediction": "class BaseBlipProcessor(BaseProcessor):",
+  "reference": "class BlipImageBaseProcessor(BaseProcessor):",
+  "fences_removed": false,
+  "extraction": "upstream get_first_line_not_comment after optional whole-response fence removal",
+  "fuzzywuzzy_version": "0.18.0",
+  "similarity_backend": "difflib",
+  "metrics_source_sha256": "8189a6d1058184d18b1acad02617f013a4be75d69088c8bde9cd72424ec2026a"
+}

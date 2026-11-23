@@ -18,9 +18,9 @@ _defs:
   # recorded description_style, so each is its own anchor over a shared payload.
   index_neutral: &index_neutral
     directive: add
-    payload: { kind: bm25, index_ref: null, stale: false } # D4: opaque, swappable
+    payload: { kind: bm25, index_ref: null, stale: false } # swappable
     limits: { top_k: 10, max_snippet_bytes: 2048, timeout_seconds: 30 }
-    result_shape: pointers_plus_snippet # E0-S5
+    result_shape: pointers_plus_snippet
     description_style: neutral
   index_encouraged: &index_encouraged
     directive: add
@@ -46,7 +46,7 @@ conditions:
       grep: *allow
       read: *allow
       submit: *allow
-      network: *deny # enforced via container netns=none (D5)
+      network: *deny # enforced via container netns=none
 
   baseline_plus_index:
     extends: baseline
@@ -72,7 +72,7 @@ conditions:
     tools:
       grep: *allow
       read: *allow
-      edit: *allow # soft 'allow': agent exercises it via bash in a writable container
+      edit: *allow # agent exercises it via bash in a writable container
       run: *allow
       submit: *allow
       network: *deny

@@ -1,0 +1,94 @@
+{
+  "benchmark": "SWE-Explore",
+  "instance_id": "pydata__xarray-4629",
+  "condition": "baseline_plus_index",
+  "effective_policy": {
+    "condition": "baseline_plus_index",
+    "default_environment": false,
+    "tools": [
+      {
+        "name": "grep",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "read",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "submit",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "network",
+        "directive": "deny",
+        "status": "denied",
+        "enforcement": "enforced"
+      },
+      {
+        "name": "index_query",
+        "directive": "add",
+        "status": "added",
+        "enforcement": "best-effort",
+        "payload_kind": "bm25",
+        "index_ref_sha256": null,
+        "limits": {
+          "top_k": 10,
+          "max_snippet_bytes": 2048,
+          "timeout_seconds": 30
+        },
+        "result_shape": "pointers_plus_snippet",
+        "description_style": "neutral"
+      }
+    ],
+    "declared_sha256": "0c135eaaf431aeb3277a5444b89997f5b065a16dfa621af0ff90b88222e44d49",
+    "resolved_sha256": "834a66aacd442531e0df9486c505ac060c37b2a0f471bab5c0ab28068f86eb15"
+  },
+  "required_capabilities": [
+    "grep",
+    "read",
+    "submit"
+  ],
+  "top_k": 5,
+  "index_provenance": {
+    "kind": "bm25",
+    "build_seconds": 2.6173967899521813,
+    "index_bytes": 5177181,
+    "input_repo_sha256": "63cb663f7e1a409ece45d59aa135e37d3fcf54f5e84bacea40d10eefcb4e1602",
+    "builder_source_sha": "indextool.bm25.v1",
+    "leakage_checks_passed": true,
+    "chunk_count": 1946,
+    "serialized_path": "index.json",
+    "serialized_bytes": 6436492,
+    "serializer_version": 1
+  },
+  "mounts": [
+    {
+      "src": "/mnt/c/uni/benchmark-research/explore-input/xarray-4629/repo",
+      "dst": "/repo",
+      "readonly": true
+    },
+    {
+      "src": "/mnt/c/uni/benchmark-research/explore-input/xarray-4629/index.json",
+      "dst": "/index/index.json",
+      "readonly": true
+    },
+    {
+      "src": "/mnt/c/uni/benchmark-research/benchkit/in_container/index_query.py",
+      "dst": "/opt/index_query.py",
+      "readonly": true
+    }
+  ],
+  "image": "python:3.12-slim",
+  "image_id": "78976a69c067520ef8be34cde307ef9f6fea6dcefa50edb57039773d241ca0db",
+  "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+  "steps": 30,
+  "output_tokens_per_call": 2048,
+  "wall_time_limit_seconds": 3600,
+  "prepared_dir": "/mnt/c/uni/benchmark-research/explore-input/xarray-4629"
+}

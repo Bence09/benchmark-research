@@ -1,0 +1,66 @@
+{
+  "benchmark": "SWE-bench",
+  "instance_id": "astropy__astropy-12907",
+  "condition": "swebench_baseline",
+  "effective_policy": {
+    "condition": "swebench_baseline",
+    "default_environment": false,
+    "tools": [
+      {
+        "name": "grep",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "read",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "edit",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "run",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "submit",
+        "directive": "allow",
+        "status": "present",
+        "enforcement": "n/a"
+      },
+      {
+        "name": "network",
+        "directive": "deny",
+        "status": "denied",
+        "enforcement": "enforced"
+      }
+    ],
+    "declared_sha256": "528d04c10c52afe7d5f8ddb8031bef4eccd1e002bb47553f886ca155d20a093c",
+    "resolved_sha256": "24cc64cd09081500962a4889d7a05771ea26db0f714e95dfbc2529bafcdb2d76"
+  },
+  "required_capabilities": [
+    "grep",
+    "read",
+    "edit",
+    "run",
+    "submit"
+  ],
+  "top_k": 5,
+  "index_provenance": null,
+  "mounts": [],
+  "image": "docker.io/swebench/sweb.eval.x86_64.astropy_1776_astropy-12907:latest",
+  "cwd": "/testbed",
+  "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+  "steps": 30,
+  "output_tokens_per_call": 2048,
+  "wall_time_limit_seconds": 3600,
+  "prepared_dir": "/mnt/c/uni/benchmark-research/swebench-input/astropy__astropy-12907"
+}

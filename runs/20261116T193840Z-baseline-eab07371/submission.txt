@@ -1,0 +1,4 @@
+RELEVANT_FILES:
+- xarray/core/merge.py:495-526
+- xarray/core/merge.py:616-625
+- xarray/tests/test_merge.py:66-110

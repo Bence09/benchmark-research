@@ -1,0 +1,25 @@
+{
+  "kind": "regions",
+  "payload": [
+    {
+      "path": "xarray/core/merge.py",
+      "start": 495,
+      "end": 526
+    },
+    {
+      "path": "xarray/core/merge.py",
+      "start": 616,
+      "end": 623
+    },
+    {
+      "path": "xarray/core/concat.py",
+      "start": 425,
+      "end": 438
+    },
+    {
+      "path": "xarray/core/concat.py",
+      "start": 525,
+      "end": 535
+    }
+  ]
+}
